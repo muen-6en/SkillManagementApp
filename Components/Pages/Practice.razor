@@ -1,0 +1,303 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/practice"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("実践")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="実践" />
+    <h1>実践</h1>
+    <p role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="実践" />
+
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>実践</h1>
+    <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
+    <p>スキル: <strong>@_skill.Name</strong></p>
+    <p>サイクル @_cycle.Sequence で、到達レベルに合わせたやることを決め、やったことを記録します。</p>
+
+    @if (_targetLevel is not null)
+    {
+        <section class="panel panel-inline" aria-labelledby="target-level-summary-heading">
+            <h2 id="target-level-summary-heading">到達レベル</h2>
+            <p class="level-name">@_targetLevel.Name</p>
+            <p class="level-meaning">@_targetLevel.Meaning</p>
+        </section>
+    }
+    else
+    {
+        <p class="validation-message" role="alert">
+            到達レベルが未設定です。<a href="@CycleRoutes.Target(SkillId, CycleId)">到達レベル画面</a>で先に保存してください。
+        </p>
+    }
+
+    <section class="panel" aria-labelledby="action-plan-heading">
+        <h2 id="action-plan-heading">やること</h2>
+        @if (_isActionSaved)
+        {
+            <p class="status status-success" role="status">やることは保存済みです。</p>
+        }
+        else
+        {
+            <p role="status">やることはまだ保存されていません。</p>
+        }
+
+        <EditForm Model="_actionForm" FormName="saveAction" OnSubmit="SaveActionAsync">
+            <div class="form-field">
+                <label for="action-body">やること</label>
+                <InputTextArea id="action-body"
+                               class="form-control form-control-multiline"
+                               @bind-Value="_actionForm.Body"
+                               aria-describedby="action-body-error action-save-status"
+                               aria-invalid="@(_actionError is not null)"
+                               rows="5"
+                               maxlength="4000" />
+                @if (_actionError is not null)
+                {
+                    <p id="action-body-error" class="validation-message" role="alert">@_actionError</p>
+                }
+            </div>
+            @if (_actionSaveError is not null)
+            {
+                <p class="validation-message" role="alert">@_actionSaveError</p>
+            }
+            @if (_actionSaveStatus is not null)
+            {
+                <p id="action-save-status" class="status status-success" role="status">@_actionSaveStatus</p>
+            }
+            <button type="submit" class="btn-primary" disabled="@(!_canSaveAction)">やることを保存</button>
+        </EditForm>
+    </section>
+
+    <section class="panel" aria-labelledby="practice-records-heading">
+        <h2 id="practice-records-heading">実践記録</h2>
+        <p>やったことは、やることとは別に複数件残せます。</p>
+
+        @if (_records.Count == 0)
+        {
+            <p>記録はまだありません。</p>
+        }
+        else
+        {
+            <ul class="record-list">
+                @foreach (var record in _records)
+                {
+                    <li>
+                        <time datetime="@record.RecordedAt.ToString("yyyy-MM-ddTHH:mm:ss")">
+                            @record.RecordedAt.ToString("yyyy-MM-dd HH:mm")
+                        </time>
+                        <p class="record-body">@record.Body</p>
+                    </li>
+                }
+            </ul>
+        }
+
+        <EditForm Model="_recordForm" FormName="addPracticeRecord" OnSubmit="AddRecordAsync">
+            <div class="form-field">
+                <label for="record-body">記録を追加</label>
+                <InputTextArea id="record-body"
+                               class="form-control form-control-multiline"
+                               @bind-Value="_recordForm.Body"
+                               aria-describedby="record-body-error record-save-status"
+                               aria-invalid="@(_recordError is not null)"
+                               rows="4"
+                               maxlength="4000" />
+                @if (_recordError is not null)
+                {
+                    <p id="record-body-error" class="validation-message" role="alert">@_recordError</p>
+                }
+            </div>
+            @if (_recordSaveError is not null)
+            {
+                <p class="validation-message" role="alert">@_recordSaveError</p>
+            }
+            @if (_recordSaveStatus is not null)
+            {
+                <p id="record-save-status" class="status status-success" role="status">@_recordSaveStatus</p>
+            }
+            <button type="submit" class="btn-primary cycle-form-submit">記録を追加</button>
+        </EditForm>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private LearningLevelDefinition? _targetLevel;
+    private bool _invalid;
+    private bool _isActionSaved;
+    private bool _canSaveAction;
+    private IReadOnlyList<PracticeRecord> _records = Array.Empty<PracticeRecord>();
+    private readonly ActionForm _actionForm = new();
+    private readonly RecordForm _recordForm = new();
+    private string? _actionError;
+    private string? _actionSaveError;
+    private string? _actionSaveStatus;
+    private string? _recordError;
+    private string? _recordSaveError;
+    private string? _recordSaveStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _targetLevel = null;
+        _actionError = null;
+        _actionSaveError = null;
+        _actionSaveStatus = null;
+        _recordError = null;
+        _recordSaveError = null;
+        _recordSaveStatus = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+        _targetLevel = LearningLevels.Find(_cycle.TargetLevel);
+        _canSaveAction = _targetLevel is not null;
+
+        await LoadActionAsync(db);
+        await LoadRecordsAsync(db);
+    }
+
+    private async Task LoadActionAsync(AppDbContext db)
+    {
+        var action = await db.CycleActions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == CycleId);
+
+        _actionForm.Body = action?.Body ?? string.Empty;
+        _isActionSaved = action is not null && !string.IsNullOrWhiteSpace(action.Body);
+    }
+
+    private async Task LoadRecordsAsync(AppDbContext db)
+    {
+        _records = await db.PracticeRecords
+            .AsNoTracking()
+            .Where(record => record.CycleId == CycleId)
+            .OrderByDescending(record => record.RecordedAt)
+            .ThenByDescending(record => record.Id)
+            .ToListAsync();
+    }
+
+    private async Task SaveActionAsync()
+    {
+        _actionError = null;
+        _actionSaveError = null;
+        _actionSaveStatus = null;
+
+        if (_targetLevel is null)
+        {
+            _actionSaveError = "到達レベルを先に保存してください。";
+            return;
+        }
+
+        var body = _actionForm.Body.Trim();
+        if (string.IsNullOrEmpty(body))
+        {
+            _actionError = "やることを入力してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cycle = await db.Cycles.AsNoTracking().FirstOrDefaultAsync(item => item.Id == CycleId && item.SkillId == SkillId);
+            if (cycle is null || !LearningLevels.IsValid(cycle.TargetLevel))
+            {
+                _actionSaveError = "到達レベルを先に保存してください。";
+                return;
+            }
+
+            var action = await db.CycleActions.FirstOrDefaultAsync(item => item.CycleId == CycleId);
+            if (action is null)
+            {
+                db.CycleActions.Add(new CycleAction
+                {
+                    CycleId = CycleId,
+                    Body = body,
+                });
+            }
+            else
+            {
+                action.Body = body;
+            }
+
+            await db.SaveChangesAsync();
+            _isActionSaved = true;
+            _actionSaveStatus = "やることを保存しました。";
+        }
+        catch (Exception)
+        {
+            _actionSaveError = "保存に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private async Task AddRecordAsync()
+    {
+        _recordError = null;
+        _recordSaveError = null;
+        _recordSaveStatus = null;
+
+        var body = _recordForm.Body.Trim();
+        if (string.IsNullOrEmpty(body))
+        {
+            _recordError = "記録の内容を入力してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cycleExists = await db.Cycles.AnyAsync(item => item.Id == CycleId && item.SkillId == SkillId);
+            if (!cycleExists)
+            {
+                _invalid = true;
+                return;
+            }
+
+            db.PracticeRecords.Add(new PracticeRecord
+            {
+                CycleId = CycleId,
+                Body = body,
+                RecordedAt = DateTime.Now,
+            });
+            await db.SaveChangesAsync();
+
+            _recordForm.Body = string.Empty;
+            _recordSaveStatus = "記録を追加しました。";
+            await LoadRecordsAsync(db);
+            await LoadActionAsync(db);
+        }
+        catch (Exception)
+        {
+            _recordSaveError = "記録の追加に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private sealed class ActionForm
+    {
+        public string Body { get; set; } = string.Empty;
+    }
+
+    private sealed class RecordForm
+    {
+        public string Body { get; set; } = string.Empty;
+    }
+}
+

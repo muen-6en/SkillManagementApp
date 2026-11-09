@@ -1,0 +1,147 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/current"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("現状")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="現状" />
+    <h1>現状</h1>
+    <p role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="現状" />
+    @if (_isCurrentLevelSaved)
+    {
+        <p class="cycle-stage-link">
+            <a href="@CycleRoutes.Target(SkillId, CycleId)">到達目標へ進む</a>
+        </p>
+    }
+
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>現状</h1>
+    <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
+    <p>スキル: <strong>@_skill.Name</strong></p>
+    <p>あなたの現在のレベルを登録してください。</p>
+
+    @if (_isCurrentLevelSaved)
+    {
+        <p class="status status-success" role="status">現在地は保存済みです。</p>
+    }
+    else
+    {
+        <p role="status">現在地はまだ保存されていません。</p>
+    }
+
+    <EditForm Model="_form" FormName="saveCurrentLevel" OnSubmit="SaveAsync">
+        <fieldset class="level-fieldset">
+            <legend>現在地（5段階から1つ選ぶ）</legend>
+            <InputRadioGroup @bind-Value="_form.SelectedLevel" Name="current-level">
+                @foreach (var level in LearningLevels.All)
+                {
+                    var inputId = $"current-level-{level.Code}";
+                    <div class="level-option">
+                        <InputRadio Value="@level.Code" id="@inputId" />
+                        <label for="@inputId">
+                            <span class="level-name">@level.Name</span>
+                            <span class="level-meaning">@level.Meaning</span>
+                        </label>
+                    </div>
+                }
+            </InputRadioGroup>
+        </fieldset>
+        @if (_levelError is not null)
+        {
+            <p class="validation-message" role="alert">@_levelError</p>
+        }
+        @if (_saveError is not null)
+        {
+            <p class="validation-message" role="alert">@_saveError</p>
+        }
+        @if (_saveStatus is not null)
+        {
+            <p class="status status-success" role="status">@_saveStatus</p>
+        }
+        <button type="submit" class="btn-primary cycle-form-submit">現在地を保存</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private bool _invalid;
+    private bool _isCurrentLevelSaved;
+    private readonly CurrentLevelForm _form = new();
+    private string? _levelError;
+    private string? _saveError;
+    private string? _saveStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _levelError = null;
+        _saveError = null;
+        _saveStatus = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+        _form.SelectedLevel = _cycle.CurrentLevel ?? string.Empty;
+        _isCurrentLevelSaved = LearningLevels.IsValid(_cycle.CurrentLevel);
+    }
+
+    private async Task SaveAsync()
+    {
+        _levelError = null;
+        _saveError = null;
+        _saveStatus = null;
+
+        var selectedLevel = _form.SelectedLevel;
+        if (!LearningLevels.IsValid(selectedLevel))
+        {
+            _levelError = "現在地を1つ選んでから保存してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cycle = await db.Cycles.FirstOrDefaultAsync(item => item.Id == CycleId && item.SkillId == SkillId);
+            if (cycle is null)
+            {
+                _invalid = true;
+                return;
+            }
+
+            cycle.CurrentLevel = selectedLevel;
+            await db.SaveChangesAsync();
+            _isCurrentLevelSaved = true;
+            _saveStatus = "現在地を保存しました。";
+        }
+        catch (Exception)
+        {
+            _saveError = "保存に失敗しました。選んだ内容はそのまま残っています。";
+        }
+    }
+
+    private sealed class CurrentLevelForm
+    {
+        public string SelectedLevel { get; set; } = string.Empty;
+    }
+}
+

@@ -1,0 +1,43 @@
+@inherits LayoutComponentBase
+
+<header class="app-header">
+    <div class="app-header-inner">
+        <a class="app-header-brand" href="@AppRoutes.Home">
+            <span class="app-header-brand-mark" aria-hidden="true"></span>
+            <span class="app-header-brand-text">@AppRoutes.AppName</span>
+        </a>
+        <nav class="app-nav" aria-label="主要な画面">
+            <ul class="app-nav-list">
+                <li class="app-nav-item">
+                    <NavLink class="app-nav-link" href="@AppRoutes.Home" Match="NavLinkMatch.All">
+                        <span class="app-nav-link-mark" aria-hidden="true"></span>
+                        <span class="app-nav-link-text">使い方</span>
+                    </NavLink>
+                </li>
+                <li class="app-nav-item">
+                    <NavLink class="app-nav-link" href="@AppRoutes.Inventory" Match="NavLinkMatch.All">
+                        <span class="app-nav-link-mark" aria-hidden="true"></span>
+                        <span class="app-nav-link-text">スキル棚卸</span>
+                    </NavLink>
+                </li>
+                <li class="app-nav-item">
+                    <NavLink class="app-nav-link" href="@AppRoutes.SkillSuggestion">
+                        <span class="app-nav-link-mark" aria-hidden="true"></span>
+                        <span class="app-nav-link-text">スキル選定</span>
+                    </NavLink>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header>
+<main class="app-main">
+    @Body
+</main>
+
+<LearningLevelsSidebar />
+
+<div id="blazor-error-ui" data-nosnippet>
+    処理を完了できませんでした。
+    <a href="" class="reload">再読み込み</a>
+    <button type="button" class="dismiss">閉じる</button>
+</div>

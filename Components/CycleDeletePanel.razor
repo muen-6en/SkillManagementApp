@@ -1,0 +1,87 @@
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject NavigationManager Navigation
+
+<section class="panel panel-danger" aria-labelledby="@HeadingId">
+    <h2 id="@HeadingId">@Title</h2>
+    <p>@Description</p>
+
+    @if (_confirming)
+    {
+        <p class="validation-message" role="alert">@ConfirmMessage</p>
+        @if (_deleteError is not null)
+        {
+            <p class="validation-message" role="alert">@_deleteError</p>
+        }
+        <div class="form-actions">
+            <button type="button" class="btn-danger" @onclick="ConfirmDeleteAsync">@ConfirmButtonText</button>
+            <button type="button" class="btn-secondary" @onclick="CancelConfirm">キャンセル</button>
+        </div>
+    }
+    else
+    {
+        <button type="button" class="btn-danger" @onclick="StartConfirm">@StartButtonText</button>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public int SkillId { get; set; }
+
+    [Parameter, EditorRequired]
+    public int CycleId { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "サイクルの削除";
+
+    [Parameter]
+    public string Description { get; set; } = "このサイクルの現状、到達レベル、やること、実践記録、ふりかえりを削除します。";
+
+    [Parameter]
+    public string ConfirmMessage { get; set; } = "このサイクルを削除しますか？やることと記録も一緒に消えます。";
+
+    [Parameter]
+    public string StartButtonText { get; set; } = "このサイクルを削除";
+
+    [Parameter]
+    public string ConfirmButtonText { get; set; } = "削除する";
+
+    [Parameter]
+    public string HeadingId { get; set; } = "delete-cycle-heading";
+
+    private bool _confirming;
+    private string? _deleteError;
+
+    private void StartConfirm()
+    {
+        _confirming = true;
+        _deleteError = null;
+    }
+
+    private void CancelConfirm()
+    {
+        _confirming = false;
+        _deleteError = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        _deleteError = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var deleted = await DeletionOperations.TryDeleteCycleAsync(db, SkillId, CycleId);
+            if (!deleted)
+            {
+                _deleteError = "削除できませんでした。";
+                return;
+            }
+
+            Navigation.NavigateTo(AppRoutes.Inventory);
+        }
+        catch (Exception)
+        {
+            _deleteError = "削除に失敗しました。データは残っています。";
+        }
+    }
+}

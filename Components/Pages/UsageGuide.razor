@@ -1,0 +1,94 @@
+@page "/"
+
+<PageTitle>@AppRoutes.PageTitle("使い方")</PageTitle>
+
+<h1>使い方</h1>
+<p>
+    このアプリは、1つのスキルについて「いまどこにいるか」「どこへ向かうか」「何をするか」を記録し、
+    サイクルを回しながら学習を進めるための補助ツールです。データはお使いの PC のローカルに保存されます。
+</p>
+
+<section class="panel guide-section" aria-labelledby="guide-inventory-heading">
+    <h2 id="guide-inventory-heading">スキル棚卸から始める</h2>
+    <ol class="guide-steps">
+        <li>
+            <strong>スキルを追加する</strong>
+            <p>「新しく追加するスキル」で名前を入力し、必要ならタグを付けて「スキルに追加」します。</p>
+        </li>
+        <li>
+            <strong>編集でサイクルを開く</strong>
+            <p>「あなたのスキル」一覧の「編集」から、そのスキルの現状画面へ進みます。</p>
+        </li>
+        <li>
+            <strong>実績を見る</strong>
+            <p>「実績確認」で、サイクルごとの現状・到達レベル・実践記録の件数を表で確認できます。</p>
+        </li>
+    </ol>
+    <p>
+        <a class="btn-primary guide-start-link" href="@AppRoutes.Inventory">スキル棚卸へ</a>
+    </p>
+</section>
+
+<section class="panel guide-section" aria-labelledby="guide-cycle-heading">
+    <h2 id="guide-cycle-heading">サイクルとは</h2>
+    <p>
+        サイクルは、1つのスキルに対する学習の1周です。番号（1、2、3…）が付き、
+        ふりかえりから次のサイクルを作ると番号が増えます。前のサイクルの記録は残り、差分画面で直前のサイクルと比較できます。
+    </p>
+    <p>1サイクルでは、次の4段階をこの順で進めます。</p>
+    <ol class="guide-cycle-stages">
+        <li>
+            <strong>現状</strong>
+            <p>いまの自分のレベルを、学習の5段階から1つ選んで保存します。</p>
+        </li>
+        <li>
+            <strong>到達レベル</strong>
+            <p>このサイクルで目指すレベルを、同じ5段階から1つ選んで保存します。</p>
+        </li>
+        <li>
+            <strong>実践</strong>
+            <p>到達レベルに合わせた「やること」を決め、実際に取り組んだ内容を記録として残します（記録は複数件可）。</p>
+        </li>
+        <li>
+            <strong>ふりかえり</strong>
+            <p>サイクルの振り返りを書き、内容がある場合は次のサイクルを作成できます。新しいサイクルでは再び「現状」から始めます。</p>
+        </li>
+    </ol>
+</section>
+
+<section class="panel guide-section" aria-labelledby="guide-challenges-heading">
+    <h2 id="guide-challenges-heading">学習を進めるときの課題と対策</h2>
+    <p>スキルを身に着けたいときに出てくる、よくある課題を整理します。</p>
+
+    <h3>モチベーションが上がらない</h3>
+    <ul class="guide-tips">
+        <li>自分のモチベーションの源泉を探る。内発的動機づけは自分の意思で行動する動機づけ、外的動機づけは外部からの圧力や報酬による動機づけです。</li>
+        <li>「没頭できることはなにか？」「達成感を感じる瞬間は？」「やる気が出ない時の状況は？」「1年後の自分に何を期待するか？」を考える。</li>
+        <li>ERG理論の3つの欲求（生存欲求・関係欲求・成長欲求）が満たされているかを確認する。</li>
+    </ul>
+
+    <h3>時間がない</h3>
+    <ul class="guide-tips">
+        <li>作業の余白がない理由を確認する。例: 割り込みタスクが多い、会議が多い、考えている間に次のタスクへ移る必要がある。</li>
+        <li>「そのタスクは本当にいま必要か？」「他の人からのタスクは本当に自分がやるべきか？」「いつもやっている作業をもっと効率化できないか？」を考える。</li>
+        <li>タスクの優先順位を付け、作業したい時間を予定にブロックする。</li>
+        <li>無駄なタスクや不要な会議を減らし、意識的に余白の時間をつくる。</li>
+    </ul>
+
+    <h3>ストレスが多い</h3>
+    <ul class="guide-tips">
+        <li>仕事のミス、仕事量や責任、人間関係、周囲との比較など、ストレスの要因を整理する。</li>
+        <li>「それは本当に自分のミスか？」「最悪のケースを考え過ぎていないか？」「それは本当にいま起こっていることか？」「他人のことを気にし過ぎていないか？」を確認する。</li>
+        <li>起こったことと自分の気持ちを整理し、必要に応じて相談する。</li>
+        <li>他人と比較せず、ストレスを発散する方法を知っておく。</li>
+    </ul>
+</section>
+
+<section class="panel guide-section" aria-labelledby="guide-tips-heading">
+    <h2 id="guide-tips-heading">その他の操作</h2>
+    <ul class="guide-tips">
+        <li>各サイクル画面の「差分を見る」で、直前のサイクルとの設定の違いを確認できます。</li>
+        <li>スキルやサイクルは、確認のあと削除できます。削除すると関連する記録も一緒に消えます。</li>
+        <li>画面上部のパンくずから、スキル棚卸や前の段階の画面へ戻れます。</li>
+    </ul>
+</section>

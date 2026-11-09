@@ -1,0 +1,13 @@
+@page "/guide"
+@inject NavigationManager Navigation
+
+<PageTitle>@AppRoutes.PageTitle("使い方")</PageTitle>
+
+<p role="status">使い方へ移動しています。</p>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo(AppRoutes.Home, replace: true);
+    }
+}

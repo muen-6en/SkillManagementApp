@@ -1,0 +1,8 @@
+<div class="cycle-diff-action">
+    <a class="btn-primary cycle-diff-button" href="@DiffHref">差分を見る</a>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string DiffHref { get; set; } = string.Empty;
+}

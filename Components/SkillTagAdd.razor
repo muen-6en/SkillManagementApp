@@ -1,0 +1,72 @@
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<div class="skill-tag-add skill-tag-add-inline">
+    <div class="skill-tag-add-row">
+        <InputText id="@_tagInputId"
+                   class="form-control skill-tag-input"
+                   @bind-Value="_tagName"
+                   maxlength="64"
+                   aria-label="@($"{SkillName} のタグ名")"
+                   aria-describedby="@_tagErrorId"
+                   placeholder="タグ名" />
+        <button type="button" class="btn-secondary btn-compact" @onclick="AddTagAsync">追加</button>
+    </div>
+    @if (_tagError is not null)
+    {
+        <p id="@_tagErrorId" class="validation-message" role="alert">@_tagError</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public int SkillId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string SkillName { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<SkillTagView> Tags { get; set; } = Array.Empty<SkillTagView>();
+
+    [Parameter]
+    public EventCallback OnTagsChanged { get; set; }
+
+    private string _tagName = string.Empty;
+    private string? _tagError;
+    private readonly string _tagInputId = $"skill-tag-add-{Guid.NewGuid():N}";
+    private readonly string _tagErrorId = $"skill-tag-add-error-{Guid.NewGuid():N}";
+
+    private async Task AddTagAsync()
+    {
+        _tagError = null;
+        var name = _tagName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _tagError = "タグ名を入力してください。";
+            return;
+        }
+
+        if (Tags.Any(tag => string.Equals(tag.Name, name, StringComparison.Ordinal)))
+        {
+            _tagError = "同じタグがすでに付いています。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var added = await SkillTagOperations.TryAddTagAsync(db, SkillId, name);
+            if (!added)
+            {
+                _tagError = "タグを追加できませんでした。";
+                return;
+            }
+
+            _tagName = string.Empty;
+            await OnTagsChanged.InvokeAsync();
+        }
+        catch (Exception)
+        {
+            _tagError = "タグの追加に失敗しました。";
+        }
+    }
+}

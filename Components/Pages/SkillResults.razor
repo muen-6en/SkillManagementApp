@@ -1,0 +1,96 @@
+@page "/skills/{SkillId:int}/results"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("実績")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="実績" />
+    <h1>実績</h1>
+    <p role="alert">指定されたスキルは見つかりませんでした。</p>
+}
+else if (_skill is not null)
+{
+    <CycleStageNav StageTitle="実績" />
+    <h1>実績</h1>
+    <p>スキル: <strong>@_skill.Name</strong></p>
+    <p>サイクルごとの現状・到達レベルと、実践記録の件数を表で見ます。</p>
+
+    @if (_rows.Count == 0)
+    {
+        <p role="status">サイクルはまだありません。</p>
+    }
+    else
+    {
+        <div class="diff-table-wrap">
+            <table class="diff-table results-table">
+                <caption class="visually-hidden">@_skill.Name のサイクル別実績</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">サイクルの順</th>
+                        <th scope="col">現状</th>
+                        <th scope="col">到達レベル</th>
+                        <th scope="col">実践記録の件数</th>
+                        <th scope="col">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr>
+                            <th scope="row">@row.Sequence</th>
+                            <td>
+                                <ResultsLevelCell LevelName="@row.CurrentLevelName"
+                                                  LevelMeaning="@row.CurrentLevelMeaning" />
+                            </td>
+                            <td>
+                                <ResultsLevelCell LevelName="@row.TargetLevelName"
+                                                  LevelMeaning="@row.TargetLevelMeaning" />
+                            </td>
+                            <td>@row.RecordCount</td>
+                            <td>
+                                <CycleDeleteTableAction SkillId="@SkillId"
+                                                        CycleId="@row.CycleId"
+                                                        Sequence="@row.Sequence"
+                                                        OnDeleted="@ReloadRowsAsync" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    private Skill? _skill;
+    private IReadOnlyList<SkillResultRow> _rows = Array.Empty<SkillResultRow>();
+    private bool _invalid;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _rows = Array.Empty<SkillResultRow>();
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var skill = await db.Skills.AsNoTracking().FirstOrDefaultAsync(item => item.Id == SkillId);
+        if (skill is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        _skill = skill;
+        _rows = await SkillResultsLoader.LoadAsync(db, SkillId);
+    }
+
+    private async Task ReloadRowsAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _rows = await SkillResultsLoader.LoadAsync(db, SkillId);
+    }
+}

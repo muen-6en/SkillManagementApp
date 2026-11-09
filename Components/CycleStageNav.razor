@@ -1,0 +1,24 @@
+<nav class="cycle-breadcrumb" aria-label="現在位置">
+    <ol class="cycle-breadcrumb-list">
+        <li class="cycle-breadcrumb-item">
+            <a href="@AppRoutes.Inventory">スキル棚卸</a>
+        </li>
+        @foreach (var item in IntermediateItems)
+        {
+            <li class="cycle-breadcrumb-item">
+                <a href="@item.Href">@item.Title</a>
+            </li>
+        }
+        <li class="cycle-breadcrumb-item" aria-current="page">
+            @StageTitle
+        </li>
+    </ol>
+</nav>
+
+@code {
+    [Parameter, EditorRequired]
+    public string StageTitle { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<CycleBreadcrumbItem> IntermediateItems { get; set; } = Array.Empty<CycleBreadcrumbItem>();
+}

@@ -1,0 +1,31 @@
+<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+
+<dialog id="components-reconnect-modal" data-nosnippet>
+    <div class="components-reconnect-container">
+        <div class="components-rejoining-animation" aria-hidden="true">
+            <div></div>
+            <div></div>
+        </div>
+        <p class="components-reconnect-first-attempt-visible">
+            サーバーへ再接続しています。
+        </p>
+        <p class="components-reconnect-repeated-attempt-visible">
+            再接続に失敗しました。<span id="components-seconds-to-next-attempt"></span>秒後にやり直します。
+        </p>
+        <p class="components-reconnect-failed-visible">
+            再接続できませんでした。もう一度試すか、ページを再読み込みしてください。
+        </p>
+        <button type="button" id="components-reconnect-button" class="components-reconnect-failed-visible">
+            もう一度接続する
+        </button>
+        <p class="components-pause-visible">
+            サーバーがこのセッションを一時停止しました。
+        </p>
+        <p class="components-resume-failed-visible">
+            セッションを再開できませんでした。もう一度試すか、ページを再読み込みしてください。
+        </p>
+        <button type="button" id="components-resume-button" class="components-pause-visible components-resume-failed-visible">
+            セッションを再開する
+        </button>
+    </div>
+</dialog>

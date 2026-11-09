@@ -1,0 +1,86 @@
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<div class="skill-disclosure-actions-wrap">
+    @if (_deleteError is not null)
+    {
+        <p class="validation-message" role="alert">@_deleteError</p>
+    }
+
+    @if (_confirmingDelete)
+    {
+        <p class="skill-disclosure-confirm" role="alert">
+            スキル「@SkillName」と、そのサイクル以下のデータを削除します。本当に削除しますか？
+        </p>
+        <div class="skill-action-buttons">
+            <button type="button" class="btn-danger" @onclick="ConfirmDeleteAsync">削除する</button>
+            <button type="button" class="btn-secondary" @onclick="CancelDelete">キャンセル</button>
+        </div>
+    }
+    else
+    {
+        <div class="skill-action-buttons">
+            <button type="button" class="btn-primary skill-action-edit" @onclick="OpenLearningAsync">
+                編集
+            </button>
+            <button type="button" class="btn-danger skill-action-delete" @onclick="StartDelete">削除</button>
+            <a class="btn-secondary skill-action-link skill-action-results" href="@ResultsHref">実績確認</a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public int SkillId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string SkillName { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string ResultsHref { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnOpenLearning { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleted { get; set; }
+
+    private bool _confirmingDelete;
+    private string? _deleteError;
+
+    private Task OpenLearningAsync() => OnOpenLearning.InvokeAsync();
+
+    private void StartDelete()
+    {
+        _confirmingDelete = true;
+        _deleteError = null;
+    }
+
+    private void CancelDelete()
+    {
+        _confirmingDelete = false;
+        _deleteError = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        _deleteError = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var deleted = await DeletionOperations.TryDeleteSkillAsync(db, SkillId);
+            if (!deleted)
+            {
+                _deleteError = "削除できませんでした。";
+                return;
+            }
+
+            _confirmingDelete = false;
+            await OnDeleted.InvokeAsync();
+        }
+        catch (Exception)
+        {
+            _deleteError = "削除に失敗しました。データは残っています。";
+        }
+    }
+}

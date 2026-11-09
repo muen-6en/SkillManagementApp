@@ -1,0 +1,13 @@
+@page "/inventory/history"
+@page "/inventory/{InventoryId:int}"
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter]
+    public int InventoryId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo(AppRoutes.Inventory, replace: true);
+    }
+}

@@ -1,0 +1,239 @@
+@page "/skills/suggest"
+@inject NavigationManager Navigation
+
+<PageTitle>@AppRoutes.PageTitle("スキル選定")</PageTitle>
+
+<CycleStageNav StageTitle="スキル選定" />
+
+<h1>身に着けるスキルを選ぶ</h1>
+<p>質問に答えると、回答に合いそうなスキル候補を整理できます。最終的な選択はあなたが行います。</p>
+@if (_entryPoint is null || _entryPoint == SkillSuggestionCatalog.WorkProblems)
+{
+    <p>
+        進め方：期間を選ぶ → その期間のタスクを並べる → タスクごとの困りごとを整理する
+        → 必要なスキルを選んで、スキル棚卸に追加する
+    </p>
+}
+
+@if (_entryPoint is null)
+{
+    <section class="panel suggestion-entry-panel" aria-labelledby="suggestion-entry-heading">
+        <h2 id="suggestion-entry-heading">考えるきっかけを選ぶ</h2>
+        <div class="suggestion-entry-list">
+            @foreach (var entry in SkillSuggestionCatalog.EntryPoints)
+            {
+                <button type="button"
+                        class="btn-secondary suggestion-entry-button"
+                        @onclick="() => Start(entry.Id)">
+                    @entry.Label
+                </button>
+            }
+        </div>
+    </section>
+}
+else if (_entryPoint == SkillSuggestionCatalog.WorkProblems)
+{
+    <WorkProblemFlow OnRestart="@Restart" />
+}
+else if (!_showResults)
+{
+    <section class="panel suggestion-question-panel" aria-labelledby="suggestion-question-heading">
+        <h2 id="suggestion-question-heading">質問に回答する</h2>
+        <p>ページをスクロールしながら、すべての質問に回答してください。</p>
+        <p>
+            <button type="button" class="btn-secondary btn-compact" @onclick="Restart">
+                入口を選び直す
+            </button>
+        </p>
+
+        <div class="suggestion-question-list">
+            @foreach (var question in _questions)
+            {
+                <fieldset class="suggestion-question">
+                    <legend>@question.Text</legend>
+                    @if (question.Options.Count > 0)
+                    {
+                        <div class="suggestion-options">
+                            @foreach (var option in question.Options)
+                            {
+                                var optionId = $"suggestion-{question.Id}-{option.GetHashCode()}";
+                                <div class="suggestion-option">
+                                    <input type="radio"
+                                           id="@optionId"
+                                           name="@question.Id"
+                                           value="@option"
+                                           checked="@(_answers.GetValueOrDefault(question.Id) == option)"
+                                           @onchange="() => SetAnswer(question.Id, option)" />
+                                    <label for="@optionId">@option</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        var inputId = $"suggestion-free-{question.Id}";
+                        <label for="@inputId">回答</label>
+                        <input id="@inputId"
+                               class="form-control"
+                               value="@_answers.GetValueOrDefault(question.Id)"
+                               maxlength="500"
+                               @oninput="eventArgs => SetAnswer(question.Id, eventArgs.Value?.ToString())" />
+                    }
+
+                    @if (_missingQuestionId == question.Id)
+                    {
+                        <p class="validation-message" role="alert">回答を入力または選択してください。</p>
+                    }
+                </fieldset>
+            }
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn-primary" @onclick="ShowResults">結果を見る</button>
+        </div>
+    </section>
+}
+else
+{
+    <section class="panel" aria-labelledby="suggestion-results-heading">
+        <h2 id="suggestion-results-heading">スキル候補</h2>
+        <p>回答をもとにした候補です。必要なものを選択して、スキル棚卸へ追加してください。</p>
+
+        <div class="diff-table-wrap">
+            <table class="diff-table suggestion-results-table">
+                <caption class="visually-hidden">スキル候補一覧</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">選択</th>
+                        <th scope="col">スキル候補</th>
+                        <th scope="col">必要そうな能力</th>
+                        <th scope="col">優先度</th>
+                        <th scope="col">理由</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var candidate in _candidates)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       id="@($"candidate-{candidate.Name}")"
+                                       checked="@_selectedCandidates.Contains(candidate.Name)"
+                                       @onchange="eventArgs => ToggleCandidate(candidate.Name, eventArgs)" />
+                                <label class="visually-hidden" for="@($"candidate-{candidate.Name}")">
+                                    @($"{candidate.Name}を選択")
+                                </label>
+                            </td>
+                            <th scope="row">@candidate.Name</th>
+                            <td>@candidate.Capability</td>
+                            <td>@candidate.Priority</td>
+                            <td>@candidate.Reason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_selectionError is not null)
+        {
+            <p class="validation-message" role="alert">@_selectionError</p>
+        }
+
+        <div class="form-actions suggestion-result-actions">
+            <button type="button" class="btn-secondary" @onclick="Restart">質問をやり直す</button>
+            <button type="button" class="btn-primary" @onclick="GoToInventory">
+                選択した候補を棚卸へ追加
+            </button>
+        </div>
+    </section>
+}
+
+@code {
+    private string? _entryPoint;
+    private IReadOnlyList<SkillSuggestionQuestion> _questions = Array.Empty<SkillSuggestionQuestion>();
+    private IReadOnlyList<SkillSuggestionCandidate> _candidates = Array.Empty<SkillSuggestionCandidate>();
+    private readonly Dictionary<string, string> _answers = [];
+    private readonly HashSet<string> _selectedCandidates = [];
+    private string? _missingQuestionId;
+    private string? _selectionError;
+    private bool _showResults;
+
+    private void Start(string entryPoint)
+    {
+        _entryPoint = entryPoint;
+        _questions = SkillSuggestionCatalog.Questions(entryPoint);
+        _candidates = SkillSuggestionCatalog.Candidates(entryPoint);
+        _answers.Clear();
+        _selectedCandidates.Clear();
+        _missingQuestionId = null;
+        _selectionError = null;
+        _showResults = false;
+    }
+
+    private void SetAnswer(string questionId, string? answer)
+    {
+        if (string.IsNullOrWhiteSpace(answer))
+        {
+            _answers.Remove(questionId);
+            return;
+        }
+
+        _answers[questionId] = answer.Trim();
+        if (_missingQuestionId == questionId)
+        {
+            _missingQuestionId = null;
+        }
+    }
+
+    private void ShowResults()
+    {
+        _missingQuestionId = _questions
+            .Select(question => question.Id)
+            .FirstOrDefault(questionId => !_answers.TryGetValue(questionId, out var answer) || string.IsNullOrWhiteSpace(answer));
+
+        if (_missingQuestionId is not null)
+        {
+            return;
+        }
+
+        _showResults = true;
+    }
+
+    private void ToggleCandidate(string name, ChangeEventArgs args)
+    {
+        if (args.Value is true || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedCandidates.Add(name);
+        }
+        else
+        {
+            _selectedCandidates.Remove(name);
+        }
+
+        _selectionError = null;
+    }
+
+    private void Restart()
+    {
+        _entryPoint = null;
+        _questions = Array.Empty<SkillSuggestionQuestion>();
+        _candidates = Array.Empty<SkillSuggestionCandidate>();
+        _answers.Clear();
+        _selectedCandidates.Clear();
+        _showResults = false;
+    }
+
+    private void GoToInventory()
+    {
+        if (_selectedCandidates.Count == 0)
+        {
+            _selectionError = "候補を1つ以上選択してください。";
+            return;
+        }
+
+        var values = string.Join(
+            "&suggested=",
+            _selectedCandidates.Select(Uri.EscapeDataString));
+        Navigation.NavigateTo($"{AppRoutes.Inventory}?suggested={values}");
+    }
+}

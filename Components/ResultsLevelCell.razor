@@ -1,0 +1,22 @@
+@if (LevelName is null)
+{
+    @:未設定
+}
+else
+{
+    <span class="level-cell">
+        <span class="level-name">@LevelName</span>
+        @if (LevelMeaning is not null)
+        {
+            <span class="level-meaning">@LevelMeaning</span>
+        }
+    </span>
+}
+
+@code {
+    [Parameter]
+    public string? LevelName { get; set; }
+
+    [Parameter]
+    public string? LevelMeaning { get; set; }
+}

@@ -1,0 +1,652 @@
+@inject NavigationManager Navigation
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+@if (_phase == FlowPhase.Period)
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-period-heading">
+        <h2 id="work-period-heading">タスクを棚卸する期間を選ぶ</h2>
+        <p>1日だけなら開始日だけ、連続した期間なら終了日も選択してください。</p>
+        <div class="work-period-fields">
+            <div class="form-field">
+                <label for="work-period-start">開始日</label>
+                <input id="work-period-start"
+                       class="form-control"
+                       type="date"
+                       value="@_startDate"
+                       @onchange="eventArgs => _startDate = eventArgs.Value?.ToString() ?? string.Empty"
+                       aria-describedby="work-period-error" />
+            </div>
+            <div class="form-field">
+                <label for="work-period-end">終了日（任意）</label>
+                <input id="work-period-end"
+                       class="form-control"
+                       type="date"
+                       value="@_endDate"
+                       @onchange="eventArgs => _endDate = eventArgs.Value?.ToString() ?? string.Empty"
+                       aria-describedby="work-period-error" />
+            </div>
+        </div>
+        @if (_periodError is not null)
+        {
+            <p id="work-period-error" class="validation-message" role="alert">@_periodError</p>
+        }
+        <div class="form-actions">
+            <button type="button" class="btn-secondary btn-compact" @onclick="Restart">
+                入口を選び直す
+            </button>
+            <button type="button" class="btn-primary" @onclick="ConfirmPeriod">
+                タスクを追加する
+            </button>
+        </div>
+    </section>
+}
+else if (_phase == FlowPhase.Tasks)
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-tasks-heading">
+        <h2 id="work-tasks-heading">仕事内容を整理する</h2>
+        <p>期間: @_periodText</p>
+        <p>
+            <button type="button" class="btn-secondary btn-compact" @onclick="ChangePeriod">
+                期間を変更
+            </button>
+        </p>
+        <div class="form-field">
+            <label for="work-task-name">タスク名</label>
+            <div class="work-task-input-row">
+                <input id="work-task-name"
+                       class="form-control"
+                       @bind="_taskName"
+                       maxlength="200"
+                       aria-describedby="work-task-error" />
+                <button type="button" class="btn-secondary btn-compact" @onclick="AddTaskAsync">タスクを追加</button>
+            </div>
+            @if (_taskError is not null)
+            {
+                <p id="work-task-error" class="validation-message" role="alert">@_taskError</p>
+            }
+        </div>
+
+        @if (_tasks.Count == 0)
+        {
+            <p role="status">タスクはまだありません。</p>
+        }
+        else
+        {
+            <ol class="work-task-list">
+                @for (var index = 0; index < _tasks.Count; index++)
+                {
+                    var taskIndex = index;
+                    var task = _tasks[taskIndex];
+                    <li class="work-task-item">
+                        <span class="work-task-item-name">@task.Name</span>
+                        <div class="work-task-item-actions">
+                            @if (IsAssessmentComplete(taskIndex))
+                            {
+                                <span class="work-task-complete">確認済み</span>
+                            }
+                            <button type="button"
+                                    class="btn-primary btn-compact"
+                                    @onclick="() => StartTaskAssessment(taskIndex)">
+                                課題を確認
+                            </button>
+                            <button type="button"
+                                    class="btn-secondary btn-compact"
+                                    aria-label="@($"{task.Name}を削除")"
+                                    @onclick="() => RemoveTaskAsync(task)">
+                                削除
+                            </button>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+
+        @if (AllAssessmentsComplete())
+        {
+            <div class="form-actions">
+                <button type="button" class="btn-primary" @onclick="ShowResults">
+                    課題と候補を見る
+                </button>
+            </div>
+        }
+    </section>
+}
+else if (_phase == FlowPhase.Assessment
+         && _tasks.Count > 0
+         && _assessmentIndex >= 0
+         && _assessmentIndex < _tasks.Count
+         && _assessmentIndex < _assessments.Count)
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-assessment-heading">
+        <h2 id="work-assessment-heading">タスクごとの課題を確認</h2>
+        <p>期間: @_periodText</p>
+        <p>タスク @_assessmentIndexPlusOne / @_tasks.Count: <strong>@_tasks[_assessmentIndex].Name</strong></p>
+        @{
+            var currentAssessment = _assessments[_assessmentIndex];
+        }
+        <section class="work-assessment-card" aria-labelledby="work-current-task-heading">
+            <h3 id="work-current-task-heading">@_tasks[_assessmentIndex].Name</h3>
+            @foreach (var question in AssessmentQuestions)
+            {
+                var fieldId = $"work-{_assessmentIndex}-{question.Key}";
+                <fieldset class="work-assessment-fieldset">
+                    <legend>@question.Label</legend>
+                    <div class="suggestion-options">
+                        @foreach (var option in question.Options)
+                        {
+                            var optionId = $"{fieldId}-{option.GetHashCode()}";
+                            <div class="suggestion-option">
+                                <input type="radio"
+                                       id="@optionId"
+                                       name="@fieldId"
+                                       checked="@(GetValue(currentAssessment, question.Key) == option)"
+                                       @onchange="() => SetValue(currentAssessment, question.Key, option)" />
+                                <label for="@optionId">@option</label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            }
+        </section>
+
+        @if (_assessmentError is not null)
+        {
+            <p class="validation-message" role="alert">@_assessmentError</p>
+        }
+        <div class="form-actions">
+            <button type="button" class="btn-secondary" @onclick="ReturnToTasks">仕事内容に戻る</button>
+            <button type="button" class="btn-primary" @onclick="CompleteCurrentAssessment">
+                @(_assessmentIndex == _tasks.Count - 1 ? "課題を確定" : "次のタスクへ")
+            </button>
+        </div>
+    </section>
+}
+else if (_phase == FlowPhase.Assessment)
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-assessment-recovery-heading">
+        <h2 id="work-assessment-recovery-heading">タスクの確認を再開する</h2>
+        <p class="validation-message" role="alert">
+            タスクの確認状態を読み直す必要があります。
+        </p>
+        <button type="button" class="btn-secondary" @onclick="ReturnToTasks">
+            タスク一覧へ戻る
+        </button>
+    </section>
+}
+else
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-results-heading">
+        <h2 id="work-results-heading">課題とスキル候補</h2>
+        <p>期間: @_periodText</p>
+        <p>タスクごとの課題を確認し、必要なスキル候補を選択してください。</p>
+
+        <div class="diff-table-wrap">
+            <table class="diff-table suggestion-results-table work-results-table">
+                <caption class="visually-hidden">仕事の困りごとから整理したスキル候補</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">選択</th>
+                        <th scope="col">対象タスク</th>
+                        <th scope="col">抽出した課題</th>
+                        <th scope="col">必要そうな能力</th>
+                        <th scope="col">スキル候補</th>
+                        <th scope="col">優先度</th>
+                        <th scope="col">理由</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var candidate in _candidates)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       id="@($"work-candidate-{candidate.Name}")"
+                                       checked="@_selectedCandidates.Contains(candidate.Name)"
+                                       @onchange="eventArgs => ToggleCandidate(candidate.Name, eventArgs)" />
+                                <label class="visually-hidden" for="@($"work-candidate-{candidate.Name}")">
+                                    @($"{candidate.Name}を選択")
+                                </label>
+                            </td>
+                            <td>@candidate.TaskNames</td>
+                            <td>@candidate.Issue</td>
+                            <td>@candidate.Capability</td>
+                            <th scope="row">@candidate.Name</th>
+                            <td>@candidate.Priority</td>
+                            <td>@candidate.Reason</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_selectionError is not null)
+        {
+            <p class="validation-message" role="alert">@_selectionError</p>
+        }
+        <div class="form-actions suggestion-result-actions">
+            <button type="button" class="btn-secondary" @onclick="ReturnToTasks">仕事内容に戻る</button>
+            <button type="button" class="btn-primary" @onclick="GoToInventory">
+                選択した候補を棚卸へ追加
+            </button>
+        </div>
+    </section>
+}
+
+@code {
+    private enum FlowPhase
+    {
+        Period,
+        Tasks,
+        Assessment,
+        Results,
+    }
+
+    private sealed class WorkTask
+    {
+        public WorkTask(string name, int? id = null)
+        {
+            Name = name;
+            Id = id;
+        }
+
+        public int? Id { get; }
+        public string Name { get; }
+    }
+
+    private sealed class WorkTaskAssessment
+    {
+        public string Time { get; set; } = string.Empty;
+        public string Difficulty { get; set; } = string.Empty;
+        public string Dependency { get; set; } = string.Empty;
+        public string Rework { get; set; } = string.Empty;
+        public string Improvement { get; set; } = string.Empty;
+    }
+
+    private sealed record AssessmentQuestion(string Key, string Label, IReadOnlyList<string> Options);
+
+    private sealed record WorkCandidate(
+        string Name,
+        string TaskNames,
+        string Issue,
+        string Capability,
+        string Priority,
+        string Reason);
+
+    private static readonly IReadOnlyList<AssessmentQuestion> AssessmentQuestions =
+    [
+        new("Time", "時間がかかっていますか？", ["短い", "やや長い", "長い"]),
+        new("Difficulty", "難しい・苦手だと感じますか？", ["問題ない", "難しい", "かなり難しい"]),
+        new("Dependency", "人に確認・依頼することがありますか？", ["自分だけで完結", "ときどきある", "ほとんど人に頼る"]),
+        new("Rework", "失敗や手戻りがありますか？", ["ほぼない", "ときどきある", "多い"]),
+        new("Improvement", "改善・自動化できそうですか？", ["できそう", "少しできそう", "分からない"]),
+    ];
+
+    [Parameter]
+    public EventCallback OnRestart { get; set; }
+
+    private readonly List<WorkTask> _tasks = [];
+    private readonly List<WorkTaskAssessment> _assessments = [];
+    private readonly List<WorkCandidate> _candidates = [];
+    private readonly HashSet<string> _selectedCandidates = [];
+    private FlowPhase _phase;
+    private int _assessmentIndex;
+    private string _startDate = string.Empty;
+    private string _endDate = string.Empty;
+    private string _taskName = string.Empty;
+    private string? _periodError;
+    private string? _taskError;
+    private string? _assessmentError;
+    private string? _selectionError;
+    private string _periodText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDraftAsync();
+    }
+
+    private async Task LoadDraftAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var draft = await db.SkillSuggestionDrafts
+            .AsNoTracking()
+            .Include(item => item.Tasks)
+            .FirstOrDefaultAsync(item => item.Id == 1);
+        if (draft is null || !string.Equals(draft.EntryPoint, SkillSuggestionCatalog.WorkProblems, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _startDate = draft.StartDate;
+        _endDate = draft.EndDate ?? string.Empty;
+        _periodText = string.IsNullOrWhiteSpace(_endDate)
+            ? FormatDate(draft.StartDate)
+            : $"{FormatDate(draft.StartDate)}〜{FormatDate(draft.EndDate!)}";
+        _tasks.AddRange(draft.Tasks.OrderBy(task => task.Id).Select(task => new WorkTask(task.Name, task.Id)));
+        _assessments.AddRange(draft.Tasks.OrderBy(task => task.Id).Select(task => new WorkTaskAssessment
+        {
+            Time = task.Time,
+            Difficulty = task.Difficulty,
+            Dependency = task.Dependency,
+            Rework = task.Rework,
+            Improvement = task.Improvement,
+        }));
+        _phase = _tasks.Count > 0 ? FlowPhase.Tasks : FlowPhase.Period;
+    }
+
+    private static string FormatDate(string value) =>
+        DateOnly.TryParse(value, out var date) ? date.ToString("yyyy/MM/dd") : value;
+
+    private async Task Restart() => await OnRestart.InvokeAsync();
+
+    private async Task ConfirmPeriod()
+    {
+        _periodError = null;
+        if (!DateOnly.TryParse(_startDate, out var start))
+        {
+            _periodError = "開始日を選択してください。";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_endDate))
+        {
+            _periodText = start.ToString("yyyy/MM/dd");
+        }
+        else if (!DateOnly.TryParse(_endDate, out var end))
+        {
+            _periodError = "終了日を正しく選択してください。";
+            return;
+        }
+        else if (end < start)
+        {
+            _periodError = "終了日は開始日以降の日付を選択してください。";
+            return;
+        }
+        else
+        {
+            _periodText = $"{start:yyyy/MM/dd}〜{end:yyyy/MM/dd}";
+        }
+
+        await SaveDraftPeriodAsync();
+        await LoadDraftAsync();
+        _phase = FlowPhase.Tasks;
+    }
+
+    private async Task SaveDraftPeriodAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var draft = await db.SkillSuggestionDrafts
+            .Include(item => item.Tasks)
+            .FirstOrDefaultAsync(item => item.Id == 1);
+        if (draft is null)
+        {
+            draft = new SkillSuggestionDraft
+            {
+                Id = 1,
+                EntryPoint = SkillSuggestionCatalog.WorkProblems,
+            };
+            db.SkillSuggestionDrafts.Add(draft);
+        }
+
+        draft.StartDate = _startDate;
+        draft.EndDate = string.IsNullOrWhiteSpace(_endDate) ? null : _endDate;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task ChangePeriod()
+    {
+        _tasks.Clear();
+        _assessments.Clear();
+        _candidates.Clear();
+        _selectedCandidates.Clear();
+        _taskName = string.Empty;
+        _phase = FlowPhase.Period;
+    }
+
+    private async Task AddTaskAsync()
+    {
+        _taskError = null;
+        var name = _taskName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _taskError = "タスク名を入力してください。";
+            return;
+        }
+
+        if (_tasks.Any(task => string.Equals(task.Name, name, StringComparison.Ordinal)))
+        {
+            _taskError = "同じタスクがすでに含まれています。";
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var draft = await db.SkillSuggestionDrafts.FirstOrDefaultAsync(item => item.Id == 1);
+        if (draft is null)
+        {
+            _taskError = "期間を選択してからタスクを追加してください。";
+            return;
+        }
+
+        var taskEntity = new SkillSuggestionTask
+        {
+            DraftId = draft.Id,
+            Name = name,
+        };
+        db.SkillSuggestionTasks.Add(taskEntity);
+        await db.SaveChangesAsync();
+        _tasks.Add(new WorkTask(name, taskEntity.Id));
+        _assessments.Add(new WorkTaskAssessment());
+        _taskName = string.Empty;
+    }
+
+    private async Task RemoveTaskAsync(WorkTask task)
+    {
+        var index = _tasks.IndexOf(task);
+        _tasks.Remove(task);
+        if (index >= 0 && index < _assessments.Count)
+        {
+            _assessments.RemoveAt(index);
+        }
+
+        if (task.Id is int taskId)
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var taskEntity = await db.SkillSuggestionTasks.FindAsync(taskId);
+            if (taskEntity is not null)
+            {
+                db.SkillSuggestionTasks.Remove(taskEntity);
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
+    private void StartTaskAssessment(int index)
+    {
+        _assessmentError = null;
+        while (_assessments.Count < _tasks.Count)
+        {
+            _assessments.Add(new WorkTaskAssessment());
+        }
+
+        _assessmentIndex = index;
+        _phase = FlowPhase.Assessment;
+    }
+
+    private void ReturnToTasks() => _phase = FlowPhase.Tasks;
+
+    private int _assessmentIndexPlusOne => _assessmentIndex + 1;
+
+    private bool IsAssessmentComplete(int index) =>
+        index >= 0 &&
+        index < _assessments.Count &&
+        AssessmentQuestions.All(question => !string.IsNullOrEmpty(GetValue(_assessments[index], question.Key)));
+
+    private bool AllAssessmentsComplete() =>
+        _tasks.Count > 0 &&
+        _tasks.Select((_, index) => index).All(IsAssessmentComplete);
+
+    private async Task CompleteCurrentAssessment()
+    {
+        _assessmentError = null;
+        if (!IsAssessmentComplete(_assessmentIndex))
+        {
+            _assessmentError = $"「{_tasks[_assessmentIndex].Name}」の質問にすべて回答してください。";
+            return;
+        }
+
+        await SaveAssessmentAsync(_assessmentIndex);
+        if (_assessmentIndex < _tasks.Count - 1)
+        {
+            _assessmentIndex++;
+            return;
+        }
+
+        _phase = FlowPhase.Tasks;
+    }
+
+    private async Task SaveAssessmentAsync(int index)
+    {
+        var taskId = _tasks[index].Id;
+        if (taskId is not int persistedTaskId)
+        {
+            return;
+        }
+
+        var assessment = _assessments[index];
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var task = await db.SkillSuggestionTasks.FindAsync(persistedTaskId);
+        if (task is null)
+        {
+            return;
+        }
+
+        task.Time = assessment.Time;
+        task.Difficulty = assessment.Difficulty;
+        task.Dependency = assessment.Dependency;
+        task.Rework = assessment.Rework;
+        task.Improvement = assessment.Improvement;
+        await db.SaveChangesAsync();
+    }
+
+    private static string GetValue(WorkTaskAssessment assessment, string key) =>
+        key switch
+        {
+            "Time" => assessment.Time,
+            "Difficulty" => assessment.Difficulty,
+            "Dependency" => assessment.Dependency,
+            "Rework" => assessment.Rework,
+            "Improvement" => assessment.Improvement,
+            _ => string.Empty,
+        };
+
+    private static void SetValue(WorkTaskAssessment assessment, string key, string value)
+    {
+        switch (key)
+        {
+            case "Time": assessment.Time = value; break;
+            case "Difficulty": assessment.Difficulty = value; break;
+            case "Dependency": assessment.Dependency = value; break;
+            case "Rework": assessment.Rework = value; break;
+            case "Improvement": assessment.Improvement = value; break;
+        }
+    }
+
+    private async Task ShowResults()
+    {
+        _assessmentError = null;
+        var incompleteIndex = _assessments.FindIndex(assessment =>
+            AssessmentQuestions.Any(question => string.IsNullOrEmpty(GetValue(assessment, question.Key))));
+        if (incompleteIndex >= 0)
+        {
+            _assessmentError = $"「{_tasks[incompleteIndex].Name}」の質問にすべて回答してください。";
+            return;
+        }
+
+        for (var index = 0; index < _tasks.Count; index++)
+        {
+            await SaveAssessmentAsync(index);
+        }
+
+        _candidates.Clear();
+        AddCandidate("業務効率化", "作業を見直し、時間を短縮する力", "高",
+            assessment => assessment.Time == "長い" || assessment.Improvement == "できそう",
+            "時間がかかるタスクや改善余地のあるタスクが見つかりました。");
+        AddCandidate("自動化", "繰り返し作業を仕組みで減らす力", "中",
+            assessment => assessment.Time == "長い" && assessment.Rework != "ほぼない",
+            "時間と手戻りの両方があるタスクを仕組みで減らす候補です。");
+        AddCandidate("コミュニケーション", "依頼・相談・共有を円滑にする力", "中",
+            assessment => assessment.Dependency != "自分だけで完結",
+            "他者への確認や依頼が必要なタスクを進める候補です。");
+        AddCandidate("タスク分析", "仕事を分解して課題を見つける力", "高",
+            assessment => assessment.Difficulty != "問題ない" || assessment.Rework != "ほぼない",
+            "難しさや手戻りのあるタスクの原因を整理する候補です。");
+
+        if (_candidates.Count == 0)
+        {
+            _candidates.Add(new WorkCandidate(
+                "業務分析",
+                string.Join("、", _tasks.Select(task => task.Name)),
+                "課題の詳細をさらに整理する",
+                "仕事を観察して改善点を見つける力",
+                "中",
+                "今回の回答から、まずタスクを分析する候補を提示します。"));
+        }
+
+        _selectedCandidates.Clear();
+        _phase = FlowPhase.Results;
+    }
+
+    private void AddCandidate(
+        string name,
+        string capability,
+        string priority,
+        Func<WorkTaskAssessment, bool> predicate,
+        string reason)
+    {
+        var matchedTasks = _tasks
+            .Select((task, index) => (task, assessment: _assessments[index]))
+            .Where(item => predicate(item.assessment))
+            .Select(item => item.task.Name)
+            .ToList();
+        if (matchedTasks.Count == 0)
+        {
+            return;
+        }
+
+        var issue = string.Join("、", matchedTasks.Select(task => $"{task}の課題"));
+        _candidates.Add(new WorkCandidate(
+            name,
+            string.Join("、", matchedTasks),
+            issue,
+            capability,
+            priority,
+            reason));
+    }
+
+    private void ToggleCandidate(string name, ChangeEventArgs args)
+    {
+        if (args.Value is true || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedCandidates.Add(name);
+        }
+        else
+        {
+            _selectedCandidates.Remove(name);
+        }
+
+        _selectionError = null;
+    }
+
+    private void GoToInventory()
+    {
+        if (_selectedCandidates.Count == 0)
+        {
+            _selectionError = "候補を1つ以上選択してください。";
+            return;
+        }
+
+        var values = string.Join(
+            "&suggested=",
+            _selectedCandidates.Select(Uri.EscapeDataString));
+        Navigation.NavigateTo($"{AppRoutes.Inventory}?suggested={values}");
+    }
+}

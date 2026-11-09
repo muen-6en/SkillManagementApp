@@ -1,0 +1,106 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/diff"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("差分")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="差分" />
+    <h1>差分</h1>
+    <p role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="差分" />
+
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>差分</h1>
+    <p>スキル: <strong>@_skill.Name</strong></p>
+    <p>サイクル @_cycle.Sequence の設定を、直前のサイクルと並べて見ます。</p>
+
+    @if (_previousCycle is null)
+    {
+        <p role="status">比較できる過去の設定はない</p>
+    }
+    else
+    {
+        <p>比較対象は、サイクル @_previousCycle.Sequence とサイクル @_cycle.Sequence です。</p>
+        <div class="diff-table-wrap">
+            <table class="diff-table">
+                <caption class="visually-hidden">直前のサイクルと今回のサイクルの設定差分</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">項目</th>
+                        <th scope="col">前回（サイクル @_previousCycle.Sequence）</th>
+                        <th scope="col">今回（サイクル @_cycle.Sequence）</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">現在地</th>
+                        <td>@_previousSettings!.CurrentLevelText</td>
+                        <td>@_currentSettings!.CurrentLevelText</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">到達レベル</th>
+                        <td>@_previousSettings.TargetLevelText</td>
+                        <td>@_currentSettings.TargetLevelText</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">やること</th>
+                        <td>@_previousSettings.ActionText</td>
+                        <td>@_currentSettings.ActionText</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">ふりかえり</th>
+                        <td>@_previousSettings.ReflectionText</td>
+                        <td>@_currentSettings.ReflectionText</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private Cycle? _previousCycle;
+    private CycleSettingView? _previousSettings;
+    private CycleSettingView? _currentSettings;
+    private bool _invalid;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _previousCycle = null;
+        _previousSettings = null;
+        _currentSettings = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+        _previousCycle = await CycleSettingLoader.GetPreviousCycleAsync(db, SkillId, CycleId);
+        _currentSettings = await CycleSettingLoader.LoadAsync(db, CycleId);
+
+        if (_previousCycle is not null)
+        {
+            _previousSettings = await CycleSettingLoader.LoadAsync(db, _previousCycle.Id);
+        }
+    }
+}
+

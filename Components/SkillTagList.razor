@@ -1,0 +1,62 @@
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+@if (Tags.Count > 0)
+{
+    <ul class="skill-tag-list" aria-label="@($"{SkillName} のタグ")">
+        @foreach (var tag in Tags)
+        {
+            <li class="skill-tag-item">
+                <span class="skill-tag-label"># @tag.Name</span>
+                <button type="button"
+                        class="skill-tag-remove"
+                        aria-label="@($"{tag.Name} のタグを削除")"
+                        @onclick="() => RemoveTagAsync(tag.Id)">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </li>
+        }
+    </ul>
+}
+
+@if (_tagError is not null)
+{
+    <p class="validation-message" role="alert">@_tagError</p>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int SkillId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string SkillName { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<SkillTagView> Tags { get; set; } = Array.Empty<SkillTagView>();
+
+    [Parameter]
+    public EventCallback OnTagsChanged { get; set; }
+
+    private string? _tagError;
+
+    private async Task RemoveTagAsync(int tagId)
+    {
+        _tagError = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var removed = await SkillTagOperations.TryRemoveTagAsync(db, SkillId, tagId);
+            if (!removed)
+            {
+                _tagError = "タグを外せませんでした。";
+                return;
+            }
+
+            await OnTagsChanged.InvokeAsync();
+        }
+        catch (Exception)
+        {
+            _tagError = "タグの削除に失敗しました。";
+        }
+    }
+}

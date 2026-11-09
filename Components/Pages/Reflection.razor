@@ -1,0 +1,209 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/reflection"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject NavigationManager Navigation
+
+<PageTitle>@AppRoutes.PageTitle("ふりかえり")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="ふりかえり" />
+    <h1>ふりかえり</h1>
+    <p role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="ふりかえり" />
+
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>ふりかえり</h1>
+    <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
+    <p>スキル: <strong>@_skill.Name</strong></p>
+    <p>サイクル @_cycle.Sequence の振り返りを残し、次のサイクルへ進めます。</p>
+
+    @if (_nextCycleId is int nextCycleId)
+    {
+        <p class="status status-success" role="status">次のサイクルは作成済みです。</p>
+        <p>
+            <a href="@CycleRoutes.Current(SkillId, nextCycleId)">新しいサイクルの現状へ進む</a>
+        </p>
+        <p>
+            <a href="@CycleRoutes.Target(SkillId, CycleId)">このサイクルの到達レベルへ戻る</a>
+        </p>
+    }
+
+    @if (_isReflectionSaved)
+    {
+        <p class="status status-success" role="status">ふりかえりは保存済みです。</p>
+    }
+    else
+    {
+        <p role="status">ふりかえりはまだ保存されていません。</p>
+    }
+
+    <EditForm Model="_form" FormName="saveReflection" OnSubmit="SaveAsync">
+        <div class="form-field">
+            <label for="reflection-body">ふりかえり</label>
+            <InputTextArea id="reflection-body"
+                           class="form-control form-control-multiline"
+                           @bind-Value="_form.Body"
+                           aria-describedby="reflection-body-error reflection-save-status"
+                           aria-invalid="@(_bodyError is not null)"
+                           rows="6"
+                           maxlength="4000"
+                           disabled="@(_nextCycleId is not null)" />
+            @if (_bodyError is not null)
+            {
+                <p id="reflection-body-error" class="validation-message" role="alert">@_bodyError</p>
+            }
+        </div>
+        @if (_saveError is not null)
+        {
+            <p class="validation-message" role="alert">@_saveError</p>
+        }
+        @if (_saveStatus is not null)
+        {
+            <p id="reflection-save-status" class="status status-success" role="status">@_saveStatus</p>
+        }
+        @if (_nextCycleId is null)
+        {
+            <div class="form-actions cycle-form-submit">
+                <button type="submit" class="btn-primary">ふりかえりを保存</button>
+                <button type="button" class="btn-secondary" @onclick="CreateNextCycleAsync">次のサイクルを作る</button>
+            </div>
+        }
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private int? _nextCycleId;
+    private bool _invalid;
+    private bool _isReflectionSaved;
+    private readonly ReflectionForm _form = new();
+    private string? _bodyError;
+    private string? _saveError;
+    private string? _saveStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _nextCycleId = null;
+        _bodyError = null;
+        _saveError = null;
+        _saveStatus = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+
+        var reflection = await db.ReflectionEntries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == CycleId);
+
+        _form.Body = reflection?.Body ?? string.Empty;
+        _nextCycleId = reflection?.NextCycleId;
+        _isReflectionSaved = reflection is not null && !string.IsNullOrWhiteSpace(reflection.Body);
+    }
+
+    private async Task SaveAsync()
+    {
+        _bodyError = null;
+        _saveError = null;
+        _saveStatus = null;
+
+        if (_nextCycleId is not null)
+        {
+            return;
+        }
+
+        var body = _form.Body.Trim();
+        if (string.IsNullOrEmpty(body))
+        {
+            _bodyError = "ふりかえりを入力してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var reflection = await db.ReflectionEntries.FirstOrDefaultAsync(item => item.CycleId == CycleId);
+            if (reflection is null)
+            {
+                db.ReflectionEntries.Add(new ReflectionEntry
+                {
+                    CycleId = CycleId,
+                    Body = body,
+                });
+            }
+            else if (reflection.NextCycleId is null)
+            {
+                reflection.Body = body;
+            }
+
+            await db.SaveChangesAsync();
+            _isReflectionSaved = true;
+            _saveStatus = "ふりかえりを保存しました。";
+        }
+        catch (Exception)
+        {
+            _saveError = "保存に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private async Task CreateNextCycleAsync()
+    {
+        _bodyError = null;
+        _saveError = null;
+        _saveStatus = null;
+
+        if (_nextCycleId is not null)
+        {
+            return;
+        }
+
+        var body = _form.Body.Trim();
+        if (string.IsNullOrEmpty(body))
+        {
+            _bodyError = "ふりかえりを入力してから、次のサイクルを作ってください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var nextCycle = await CycleOperations.CreateNextCycleAsync(db, SkillId, CycleId, body);
+            if (nextCycle is null)
+            {
+                _saveError = "次のサイクルを作れませんでした。入力内容はそのまま残っています。";
+                return;
+            }
+
+            Navigation.NavigateTo(CycleRoutes.Current(SkillId, nextCycle.Id));
+        }
+        catch (Exception)
+        {
+            _saveError = "次のサイクルを作れませんでした。入力内容はそのまま残っています。";
+        }
+    }
+
+    private sealed class ReflectionForm
+    {
+        public string Body { get; set; } = string.Empty;
+    }
+}
+

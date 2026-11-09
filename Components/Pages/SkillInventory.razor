@@ -1,0 +1,367 @@
+@page "/skills"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject NavigationManager Navigation
+
+<PageTitle>@AppRoutes.PageTitle("スキル棚卸")</PageTitle>
+
+<h1>スキル棚卸</h1>
+<p>スキル名を追加し、あなたのスキル一覧から編集・削除・実績確認ができます。</p>
+
+@if (_suggestedSkillNames.Count > 0)
+{
+    <p class="status status-success" role="status">
+        スキル選定で選んだ候補です。追加する名前を確認してください。
+    </p>
+    <ul class="suggested-skill-list" aria-label="スキル選定の候補">
+        @foreach (var suggestedName in _suggestedSkillNames)
+        {
+            <li>@suggestedName</li>
+        }
+    </ul>
+}
+
+@if (_openError is not null)
+{
+    <p class="validation-message" role="alert">@_openError</p>
+}
+
+<section class="panel" aria-labelledby="inventory-new-heading">
+    <h2 id="inventory-new-heading">新しく追加するスキル</h2>
+    <EditForm Model="_addForm" FormName="addInventorySkill" OnSubmit="AddSkillAsync">
+        <div class="form-field">
+            <label for="inventory-skill-name">スキル名</label>
+            <InputText id="inventory-skill-name"
+                       class="form-control"
+                       @bind-Value="_addForm.Name"
+                       aria-describedby="inventory-name-error inventory-add-status"
+                       aria-invalid="@(_addNameError is not null)"
+                       maxlength="200" />
+            @if (_addNameError is not null)
+            {
+                <p id="inventory-name-error" class="validation-message" role="alert">@_addNameError</p>
+            }
+        </div>
+
+        <div class="form-field">
+            <label for="inventory-tag-name">タグ</label>
+            <div class="skill-tag-add-row">
+                <InputText id="inventory-tag-name"
+                           class="form-control skill-tag-input"
+                           @bind-Value="_addForm.TagName"
+                           aria-describedby="inventory-tag-error"
+                           maxlength="64" />
+                <button type="button" class="btn-secondary btn-compact" @onclick="AddPendingTag">タグを追加</button>
+            </div>
+            @if (_addTagError is not null)
+            {
+                <p id="inventory-tag-error" class="validation-message" role="alert">@_addTagError</p>
+            }
+            @if (_pendingTagNames.Count > 0)
+            {
+                <ul class="skill-tag-list skill-tag-list-pending" aria-label="追加するタグ">
+                    @foreach (var tagName in _pendingTagNames)
+                    {
+                        <li class="skill-tag-item">
+                            <span class="skill-tag-label"># @tagName</span>
+                            <button type="button"
+                                    class="skill-tag-remove"
+                                    aria-label="@($"{tagName} のタグを削除")"
+                                    @onclick="() => RemovePendingTag(tagName)">
+                                <span aria-hidden="true">×</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        @if (_addSaveError is not null)
+        {
+            <p class="validation-message" role="alert">@_addSaveError</p>
+        }
+        @if (_addSaveStatus is not null)
+        {
+            <p id="inventory-add-status" class="status status-success" role="status">@_addSaveStatus</p>
+        }
+        <button type="submit" class="btn-primary">スキルに追加</button>
+    </EditForm>
+</section>
+
+<section class="panel" aria-labelledby="inventory-existing-heading">
+    <h2 id="inventory-existing-heading">あなたのスキル</h2>
+    @if (_existingSkills.Count == 0)
+    {
+        <p>スキルはまだありません。上の欄から名前を入力して追加してください。</p>
+    }
+    else
+    {
+        <ul class="skill-list skill-inventory-list">
+            @foreach (var skill in _existingSkills)
+            {
+                <li class="skill-inventory-item">
+                    <div class="skill-inventory-row">
+                        <div class="skill-inventory-name-row">
+                            <div class="skill-inventory-head">
+                                <span class="skill-inventory-mark" aria-hidden="true"></span>
+                                <span class="skill-inventory-name">@skill.Name</span>
+                            </div>
+                            <dl class="skill-inventory-cycle-summary">
+                                <div>
+                                    <dt>最新サイクル</dt>
+                                    <dd>@skill.LatestCycleSequence</dd>
+                                </div>
+                                <div>
+                                    <dt>現在地</dt>
+                                    <dd>@skill.CurrentLevelText</dd>
+                                </div>
+                                <div>
+                                    <dt>目標</dt>
+                                    <dd>@skill.TargetLevelText</dd>
+                                </div>
+                            </dl>
+                        </div>
+                        <div class="skill-inventory-actions skill-inventory-inset">
+                            <SkillDisclosureActions SkillId="@skill.SkillId"
+                                                    SkillName="@skill.Name"
+                                                    ResultsHref="@CycleRoutes.Results(skill.SkillId)"
+                                                    OnOpenLearning="@MakeOpenSkillCallback(skill.SkillId)"
+                                                    OnDeleted="@LoadExistingSkillsAsync" />
+                        </div>
+                        <div class="skill-inventory-tag-section skill-inventory-inset">
+                            <SkillTagAdd SkillId="@skill.SkillId"
+                                         SkillName="@skill.Name"
+                                         Tags="@skill.Tags"
+                                         OnTagsChanged="@LoadExistingSkillsAsync" />
+                            <div class="skill-inventory-tags">
+                                <SkillTagList SkillId="@skill.SkillId"
+                                              SkillName="@skill.Name"
+                                              Tags="@skill.Tags"
+                                              OnTagsChanged="@LoadExistingSkillsAsync" />
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private readonly AddSkillForm _addForm = new();
+    private readonly List<string> _pendingTagNames = [];
+    private readonly List<string> _suggestedSkillNames = [];
+    private IReadOnlyList<ExistingSkillItem> _existingSkills = Array.Empty<ExistingSkillItem>();
+    private string? _addNameError;
+    private string? _addTagError;
+    private string? _addSaveError;
+    private string? _addSaveStatus;
+    private string? _openError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadSuggestedSkillNames();
+        await LoadExistingSkillsAsync();
+    }
+
+    private void LoadSuggestedSkillNames()
+    {
+        var query = Navigation.ToAbsoluteUri(Navigation.Uri).Query.TrimStart('?');
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length != 2 || !string.Equals(parts[0], "suggested", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var name = Uri.UnescapeDataString(parts[1].Replace('+', ' ')).Trim();
+            if (!string.IsNullOrEmpty(name) && !_suggestedSkillNames.Contains(name, StringComparer.Ordinal))
+            {
+                _suggestedSkillNames.Add(name);
+            }
+        }
+
+        if (_suggestedSkillNames.Count > 0)
+        {
+            _addForm.Name = _suggestedSkillNames[0];
+        }
+    }
+
+    private async Task LoadExistingSkillsAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var skills = await db.Skills
+            .AsNoTracking()
+            .OrderByDescending(skill => skill.CreatedAt)
+            .ThenByDescending(skill => skill.Id)
+            .ToListAsync();
+
+        var skillIds = skills.Select(skill => skill.Id).ToList();
+        var tagRows = await db.SkillTags
+            .AsNoTracking()
+            .Where(tag => skillIds.Contains(tag.SkillId))
+            .OrderBy(tag => tag.Name)
+            .ThenBy(tag => tag.Id)
+            .ToListAsync();
+
+        var tagsBySkill = tagRows
+            .GroupBy(tag => tag.SkillId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<SkillTagView>)group
+                    .Select(tag => new SkillTagView(tag.Id, tag.Name))
+                    .ToList());
+
+        var latestCycles = await db.Cycles
+            .AsNoTracking()
+            .Where(cycle => skillIds.Contains(cycle.SkillId))
+            .OrderByDescending(cycle => cycle.Sequence)
+            .ThenByDescending(cycle => cycle.Id)
+            .ToListAsync();
+
+        var latestCycleBySkill = latestCycles
+            .GroupBy(cycle => cycle.SkillId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        _existingSkills = skills
+            .Select(skill => new ExistingSkillItem(
+                skill.Id,
+                skill.Name,
+                skill.CreatedAt,
+                tagsBySkill.GetValueOrDefault(skill.Id, Array.Empty<SkillTagView>()),
+                latestCycleBySkill.TryGetValue(skill.Id, out var cycle)
+                    ? cycle.Sequence
+                    : 0,
+                cycle is null ? "未設定" : FormatLevelName(cycle.CurrentLevel),
+                cycle is null ? "未設定" : FormatLevelName(cycle.TargetLevel)))
+            .ToList();
+    }
+
+    private void AddPendingTag()
+    {
+        _addTagError = null;
+        var name = _addForm.TagName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _addTagError = "タグ名を入力してください。";
+            return;
+        }
+
+        if (_pendingTagNames.Any(item => string.Equals(item, name, StringComparison.Ordinal)))
+        {
+            _addTagError = "同じタグがすでに含まれています。";
+            return;
+        }
+
+        _pendingTagNames.Add(name);
+        _addForm.TagName = string.Empty;
+    }
+
+    private void RemovePendingTag(string name)
+    {
+        _pendingTagNames.Remove(name);
+    }
+
+    private async Task AddSkillAsync()
+    {
+        _addNameError = null;
+        _addSaveError = null;
+        _addSaveStatus = null;
+
+        var name = _addForm.Name.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _addNameError = "スキル名を入力してください。";
+            return;
+        }
+
+        if (_existingSkills.Any(skill => string.Equals(skill.Name, name, StringComparison.Ordinal)))
+        {
+            _addNameError = "同じ名前のスキルがすでに登録されています。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skill = new Skill
+            {
+                Name = name,
+                CreatedAt = DateTime.Now,
+            };
+            db.Skills.Add(skill);
+            await db.SaveChangesAsync();
+
+            var cycle = new Cycle
+            {
+                SkillId = skill.Id,
+                Sequence = 1,
+                CreatedAt = DateTime.Now,
+            };
+            db.Cycles.Add(cycle);
+            await db.SaveChangesAsync();
+
+            await SkillTagOperations.AddTagsAsync(db, skill.Id, _pendingTagNames);
+
+            _addForm.Name = string.Empty;
+            _addForm.TagName = string.Empty;
+            _pendingTagNames.Clear();
+            _suggestedSkillNames.Remove(name);
+            if (_suggestedSkillNames.Count > 0)
+            {
+                _addForm.Name = _suggestedSkillNames[0];
+            }
+            _addSaveStatus = $"「{name}」を追加しました。";
+            await LoadExistingSkillsAsync();
+        }
+        catch (Exception)
+        {
+            _addSaveError = "追加に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private EventCallback MakeOpenSkillCallback(int skillId) =>
+        EventCallback.Factory.Create(this, () => OpenSkillAsync(skillId));
+
+    private async Task OpenSkillAsync(int skillId)
+    {
+        _openError = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skillExists = await db.Skills.AnyAsync(item => item.Id == skillId);
+            if (!skillExists)
+            {
+                await LoadExistingSkillsAsync();
+                return;
+            }
+
+            var cycle = await CycleOperations.EnsureFirstCycleAsync(db, skillId);
+            Navigation.NavigateTo(CycleRoutes.Current(skillId, cycle.Id));
+        }
+        catch (Exception)
+        {
+            _openError = "スキルを開けませんでした。もう一度試してください。";
+        }
+    }
+
+    private sealed class AddSkillForm
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string TagName { get; set; } = string.Empty;
+    }
+
+    private sealed record ExistingSkillItem(
+        int SkillId,
+        string Name,
+        DateTime CreatedAt,
+        IReadOnlyList<SkillTagView> Tags,
+        int LatestCycleSequence,
+        string CurrentLevelText,
+        string TargetLevelText);
+
+    private static string FormatLevelName(string? code) =>
+        LearningLevels.Find(code)?.Name ?? "未設定";
+}

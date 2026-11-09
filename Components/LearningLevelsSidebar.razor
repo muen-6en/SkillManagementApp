@@ -1,0 +1,49 @@
+<aside id="learning-levels-sidebar-content"
+       class="learning-levels-sidebar"
+       aria-labelledby="learning-levels-sidebar-heading"
+       hidden="@(!_isVisible)">
+    <div class="learning-levels-sidebar-header">
+        <h2 id="learning-levels-sidebar-heading">学習の5段階</h2>
+        <button type="button"
+                class="learning-levels-sidebar-toggle"
+                aria-expanded="@_isVisible"
+                aria-controls="learning-levels-sidebar-content"
+                aria-label="学習の5段階を閉じる"
+                @onclick="Hide">
+            <span aria-hidden="true">×</span>
+        </button>
+    </div>
+    <div>
+        <p>
+            現状と到達レベルでは、次の5段階から1つずつ選びます。
+        </p>
+        <ul class="guide-level-list">
+            @foreach (var level in LearningLevels.All)
+            {
+                <li class="guide-level-item">
+                    <span class="level-name">@level.Name</span>
+                    <span class="level-meaning">@level.Meaning</span>
+                </li>
+            }
+        </ul>
+    </div>
+</aside>
+
+@if (!_isVisible)
+{
+    <button type="button"
+            class="learning-levels-sidebar-toggle learning-levels-sidebar-show"
+            aria-expanded="false"
+            aria-controls="learning-levels-sidebar-content"
+            @onclick="Show">
+        学習の5段階
+    </button>
+}
+
+@code {
+    private bool _isVisible;
+
+    private void Show() => _isVisible = true;
+
+    private void Hide() => _isVisible = false;
+}

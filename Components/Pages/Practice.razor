@@ -42,7 +42,7 @@ else if (_skill is not null && _cycle is not null)
         }
         else
         {
-            <p role="status">やることはまだ保存されていません。</p>
+            <p class="status status-info" role="status">やることはまだ保存されていません。</p>
         }
 
         <EditForm Model="_actionForm" FormName="saveAction" OnSubmit="SaveActionAsync">
@@ -68,7 +68,7 @@ else if (_skill is not null && _cycle is not null)
             {
                 <p id="action-save-status" class="status status-success" role="status">@_actionSaveStatus</p>
             }
-            <button type="submit" class="btn-primary" disabled="@(!_canSaveAction)">やることを保存</button>
+            <button type="submit" class="btn-save" disabled="@(!_canSaveAction)">やることを保存</button>
         </EditForm>
     </section>
 
@@ -118,7 +118,7 @@ else if (_skill is not null && _cycle is not null)
             {
                 <p id="record-save-status" class="status status-success" role="status">@_recordSaveStatus</p>
             }
-            <button type="submit" class="btn-primary cycle-form-submit">記録を追加</button>
+            <button type="submit" class="btn-save cycle-form-submit">記録を追加</button>
         </EditForm>
     </section>
 }

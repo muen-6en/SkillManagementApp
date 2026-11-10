@@ -9,7 +9,7 @@
                    aria-label="@($"{SkillName} のタグ名")"
                    aria-describedby="@_tagErrorId"
                    placeholder="タグ名" />
-        <button type="button" class="btn-secondary btn-compact" @onclick="AddTagAsync">追加</button>
+        <button type="button" class="btn-save btn-compact" @onclick="AddTagAsync">追加</button>
     </div>
     @if (_tagError is not null)
     {

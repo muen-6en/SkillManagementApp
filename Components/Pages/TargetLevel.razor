@@ -27,7 +27,7 @@ else if (_skill is not null && _cycle is not null)
     }
     else
     {
-        <p role="status">到達レベルはまだ保存されていません。</p>
+        <p class="status status-info" role="status">到達レベルはまだ保存されていません。</p>
     }
 
     <EditForm Model="_form" FormName="saveTargetLevel" OnSubmit="SaveAsync">
@@ -59,7 +59,7 @@ else if (_skill is not null && _cycle is not null)
         {
             <p class="status status-success" role="status">@_saveStatus</p>
         }
-        <button type="submit" class="btn-primary cycle-form-submit">到達レベルを保存</button>
+        <button type="submit" class="btn-save cycle-form-submit">到達レベルを保存</button>
     </EditForm>
 }
 

@@ -24,10 +24,16 @@ else if (_skill is not null && _cycle is not null)
     {
         <p class="status status-success" role="status">次のサイクルは作成済みです。</p>
         <p>
-            <a href="@CycleRoutes.Current(SkillId, nextCycleId)">新しいサイクルの現状へ進む</a>
+            <a class="btn-primary cycle-next-button"
+               href="@CycleRoutes.Current(SkillId, nextCycleId)">
+                新しいサイクルの現状へ進む
+            </a>
         </p>
         <p>
-            <a href="@CycleRoutes.Target(SkillId, CycleId)">このサイクルの到達レベルへ戻る</a>
+            <a class="btn-back cycle-next-button"
+               href="@CycleRoutes.Target(SkillId, CycleId)">
+                このサイクルの到達レベルへ戻る
+            </a>
         </p>
     }
 
@@ -37,7 +43,7 @@ else if (_skill is not null && _cycle is not null)
     }
     else
     {
-        <p role="status">ふりかえりはまだ保存されていません。</p>
+        <p class="status status-info" role="status">ふりかえりはまだ保存されていません。</p>
     }
 
     <EditForm Model="_form" FormName="saveReflection" OnSubmit="SaveAsync">
@@ -67,7 +73,7 @@ else if (_skill is not null && _cycle is not null)
         @if (_nextCycleId is null)
         {
             <div class="form-actions cycle-form-submit">
-                <button type="submit" class="btn-primary">ふりかえりを保存</button>
+                <button type="submit" class="btn-save">ふりかえりを保存</button>
                 <button type="button" class="btn-secondary" @onclick="CreateNextCycleAsync">次のサイクルを作る</button>
             </div>
         }

@@ -10,6 +10,15 @@
     --color-status-success-background: #f1faf1;
     --color-status-success-foreground: #0e700e;
     --color-status-success-stroke: #9fd89f;
+    --color-status-info-background: #f0f6ff;
+    --color-status-info-foreground: #1a1a1a;
+    --color-status-info-stroke: #b4d6fa;
+    --color-status-warning-background: #fff4ce;
+    --color-status-warning-foreground: #4c4400;
+    --color-status-warning-stroke: #f2c661;
+    --color-save-background: #107c10;
+    --color-save-background-hover: #0b6a0b;
+    --color-save-foreground: #ffffff;
     --color-status-danger-background: #fdf3f4;
     --color-status-danger-foreground: #b10e1c;
     --color-status-danger-stroke: #eeacb2;
@@ -40,7 +49,7 @@ body {
     outline-offset: 2px;
 }
 
-:where(button, .btn-primary, .btn-secondary, .btn-danger) {
+:where(button, .btn-primary, .btn-secondary, .btn-danger, .btn-back, .btn-save) {
     margin: 4px;
 }
 
@@ -87,6 +96,12 @@ p {
     background: var(--color-status-success-background);
     color: var(--color-status-success-foreground);
     border-color: var(--color-status-success-stroke);
+}
+
+.status-info {
+    background: var(--color-status-info-background);
+    color: var(--color-status-info-foreground);
+    border-color: var(--color-status-info-stroke);
 }
 
 .status-danger {
@@ -537,6 +552,23 @@ a.skill-action-link {
     background: var(--color-neutral-background-2);
 }
 
+.btn-back {
+    min-height: 2.75rem;
+    padding: var(--space-s) var(--space-l);
+    border: 1px solid var(--color-status-warning-stroke);
+    border-radius: 4px;
+    background: var(--color-status-warning-background);
+    color: var(--color-status-warning-foreground);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-back:hover {
+    background: var(--color-status-warning-stroke);
+    color: var(--color-status-warning-foreground);
+}
+
 .form-actions {
     display: flex;
     flex-wrap: wrap;
@@ -545,6 +577,17 @@ a.skill-action-link {
 
 .cycle-form-submit {
     margin-bottom: var(--space-xl);
+}
+
+.cycle-next-button {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.cycle-next-button:hover {
+    color: var(--color-brand-foreground);
+    text-decoration: none;
 }
 
 .diff-table-wrap {
@@ -613,6 +656,24 @@ a.skill-action-link {
 .btn-primary:hover {
     background: var(--color-brand-background-hover);
     border-color: var(--color-brand-background-hover);
+}
+
+.btn-save {
+    min-height: 2.75rem;
+    padding: var(--space-s) var(--space-l);
+    border: 1px solid var(--color-save-background);
+    border-radius: 4px;
+    background: var(--color-save-background);
+    color: var(--color-save-foreground);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-save:hover {
+    border-color: var(--color-save-background-hover);
+    background: var(--color-save-background-hover);
+    color: var(--color-save-foreground);
 }
 
 .skill-list {

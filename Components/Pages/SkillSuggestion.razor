@@ -41,7 +41,7 @@ else if (!_showResults)
         <h2 id="suggestion-question-heading">質問に回答する</h2>
         <p>ページをスクロールしながら、すべての質問に回答してください。</p>
         <p>
-            <button type="button" class="btn-secondary btn-compact" @onclick="Restart">
+            <button type="button" class="btn-back btn-compact" @onclick="Restart">
                 入口を選び直す
             </button>
         </p>
@@ -140,8 +140,8 @@ else
         }
 
         <div class="form-actions suggestion-result-actions">
-            <button type="button" class="btn-secondary" @onclick="Restart">質問をやり直す</button>
-            <button type="button" class="btn-primary" @onclick="GoToInventory">
+            <button type="button" class="btn-back" @onclick="Restart">質問をやり直す</button>
+            <button type="button" class="btn-save" @onclick="GoToInventory">
                 選択した候補を棚卸へ追加
             </button>
         </div>

@@ -8,7 +8,7 @@
         <p>登録済みの期間を選ぶか、新しい期間を定義してください。</p>
         @if (_periods.Count == 0)
         {
-            <p role="status">登録済みの期間はありません。</p>
+            <p class="status status-info" role="status">登録済みの期間はありません。</p>
         }
         else
         {
@@ -32,7 +32,7 @@
             <button type="button" class="btn-primary" @onclick="BeginNewPeriod">
                 新しい期間を定義
             </button>
-            <button type="button" class="btn-secondary" @onclick="Restart">
+            <button type="button" class="btn-back" @onclick="Restart">
                 入口を選び直す
             </button>
         </div>
@@ -78,10 +78,12 @@ else if (_phase == FlowPhase.Period)
             <p id="work-period-error" class="validation-message" role="alert">@_periodError</p>
         }
         <div class="form-actions">
-            <button type="button" class="btn-secondary btn-compact" @onclick="ReturnToPeriodList">
+            <button type="button" class="btn-back btn-compact" @onclick="ReturnToPeriodList">
                 期間一覧へ戻る
             </button>
-            <button type="button" class="btn-primary" @onclick="ConfirmPeriod">
+            <button type="button"
+                    class="@(_draftId.HasValue ? "btn-save" : "btn-primary")"
+                    @onclick="ConfirmPeriod">
                 @(_draftId.HasValue ? "期間を保存" : "タスク追加画面へ")
             </button>
         </div>
@@ -93,7 +95,7 @@ else if (_phase == FlowPhase.Tasks)
         <h2 id="work-tasks-heading">仕事内容を整理する</h2>
         <p>期間: @_periodLabel（@_periodText）</p>
         <p>
-            <button type="button" class="btn-secondary btn-compact" @onclick="ChangePeriod">期間選択に戻る</button>
+            <button type="button" class="btn-back btn-compact" @onclick="ChangePeriod">期間選択に戻る</button>
             <button type="button" class="btn-secondary btn-compact" @onclick="EditPeriod">期間を変更</button>
         </p>
         <div class="form-field">
@@ -104,7 +106,7 @@ else if (_phase == FlowPhase.Tasks)
                        @bind="_taskName"
                        maxlength="200"
                        aria-describedby="work-task-error" />
-                <button type="button" class="btn-secondary btn-compact" @onclick="AddTaskAsync">タスクを追加</button>
+                <button type="button" class="btn-save btn-compact" @onclick="AddTaskAsync">タスクを追加</button>
             </div>
             @if (_taskError is not null)
             {
@@ -114,7 +116,7 @@ else if (_phase == FlowPhase.Tasks)
 
         @if (_tasks.Count == 0)
         {
-            <p role="status">タスクはまだありません。</p>
+            <p class="status status-info" role="status">タスクはまだありません。</p>
         }
         else
         {
@@ -202,8 +204,10 @@ else if (_phase == FlowPhase.Assessment
             <p class="validation-message" role="alert">@_assessmentError</p>
         }
         <div class="form-actions">
-            <button type="button" class="btn-secondary" @onclick="ReturnToTasks">仕事内容に戻る</button>
-            <button type="button" class="btn-primary" @onclick="CompleteCurrentAssessment">
+            <button type="button" class="btn-back" @onclick="ReturnToTasks">仕事内容に戻る</button>
+            <button type="button"
+                    class="@(_assessmentIndex == _tasks.Count - 1 ? "btn-save" : "btn-primary")"
+                    @onclick="CompleteCurrentAssessment">
                 @(_assessmentIndex == _tasks.Count - 1 ? "課題を確定" : "次のタスクへ")
             </button>
         </div>
@@ -216,7 +220,7 @@ else if (_phase == FlowPhase.Assessment)
         <p class="validation-message" role="alert">
             タスクの確認状態を読み直す必要があります。
         </p>
-        <button type="button" class="btn-secondary" @onclick="ReturnToTasks">
+        <button type="button" class="btn-back" @onclick="ReturnToTasks">
             タスク一覧へ戻る
         </button>
     </section>
@@ -270,8 +274,8 @@ else
             <p class="validation-message" role="alert">@_selectionError</p>
         }
         <div class="form-actions suggestion-result-actions">
-            <button type="button" class="btn-secondary" @onclick="ReturnToTasks">仕事内容に戻る</button>
-            <button type="button" class="btn-primary" @onclick="GoToInventory">
+            <button type="button" class="btn-back" @onclick="ReturnToTasks">仕事内容に戻る</button>
+            <button type="button" class="btn-save" @onclick="GoToInventory">
                 選択した候補を棚卸へ追加
             </button>
         </div>

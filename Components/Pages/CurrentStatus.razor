@@ -12,12 +12,6 @@
 else if (_skill is not null && _cycle is not null)
 {
     <CycleStageNav StageTitle="現状" />
-    @if (_isCurrentLevelSaved)
-    {
-        <p class="cycle-stage-link">
-            <a href="@CycleRoutes.Target(SkillId, CycleId)">到達目標へ進む</a>
-        </p>
-    }
 
     <CycleSequenceLabel Sequence="@_cycle.Sequence" />
     <h1>現状</h1>
@@ -27,16 +21,16 @@ else if (_skill is not null && _cycle is not null)
 
     @if (_isCurrentLevelSaved)
     {
-        <p class="status status-success" role="status">現在地は保存済みです。</p>
+        <p class="status status-success" role="status">現在のレベルは保存済みです。</p>
     }
     else
     {
-        <p role="status">現在地はまだ保存されていません。</p>
+        <p class="status status-info" role="status">現在のレベルはまだ保存されていません。</p>
     }
 
     <EditForm Model="_form" FormName="saveCurrentLevel" OnSubmit="SaveAsync">
         <fieldset class="level-fieldset">
-            <legend>現在地（5段階から1つ選ぶ）</legend>
+            <legend>現在のレベル（5段階から1つ選ぶ）</legend>
             <InputRadioGroup @bind-Value="_form.SelectedLevel" Name="current-level">
                 @foreach (var level in LearningLevels.All)
                 {
@@ -63,7 +57,16 @@ else if (_skill is not null && _cycle is not null)
         {
             <p class="status status-success" role="status">@_saveStatus</p>
         }
-        <button type="submit" class="btn-primary cycle-form-submit">現在地を保存</button>
+        <div class="form-actions cycle-form-submit">
+            <button type="submit" class="btn-save">現在のレベルを保存</button>
+            @if (_isCurrentLevelSaved)
+            {
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Target(SkillId, CycleId)">
+                    到達目標へ進む
+                </a>
+            }
+        </div>
     </EditForm>
 }
 
@@ -114,7 +117,7 @@ else if (_skill is not null && _cycle is not null)
         var selectedLevel = _form.SelectedLevel;
         if (!LearningLevels.IsValid(selectedLevel))
         {
-            _levelError = "現在地を1つ選んでから保存してください。";
+            _levelError = "現在のレベルを1つ選んでから保存してください。";
             return;
         }
 
@@ -131,7 +134,7 @@ else if (_skill is not null && _cycle is not null)
             cycle.CurrentLevel = selectedLevel;
             await db.SaveChangesAsync();
             _isCurrentLevelSaved = true;
-            _saveStatus = "現在地を保存しました。";
+            _saveStatus = "現在のレベルを保存しました。";
         }
         catch (Exception)
         {

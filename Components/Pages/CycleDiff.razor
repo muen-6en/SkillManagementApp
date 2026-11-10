@@ -20,7 +20,7 @@ else if (_skill is not null && _cycle is not null)
 
     @if (_previousCycle is null)
     {
-        <p role="status">比較できる過去の設定はない</p>
+        <p class="status status-info" role="status">比較できる過去の設定はない</p>
     }
     else
     {
@@ -37,7 +37,7 @@ else if (_skill is not null && _cycle is not null)
                 </thead>
                 <tbody>
                     <tr>
-                        <th scope="row">現在地</th>
+                        <th scope="row">現在のレベル</th>
                         <td>@_previousSettings!.CurrentLevelText</td>
                         <td>@_currentSettings!.CurrentLevelText</td>
                     </tr>

@@ -1060,8 +1060,11 @@ a.skill-action-link {
 }
 
 .work-task-complete {
+    display: inline-block;
+    margin-right: var(--space-s);
     color: var(--color-status-success-foreground);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
+    line-height: 1;
     font-weight: 600;
 }
 
@@ -1098,19 +1101,24 @@ a.skill-action-link {
 }
 
 .work-results-table {
-    min-width: 82rem;
+    min-width: 70rem;
 }
 
 .work-results-table th:nth-child(2),
 .work-results-table td:nth-child(2),
 .work-results-table th:nth-child(3),
 .work-results-table td:nth-child(3) {
-    min-width: 12rem;
+    min-width: 14rem;
 }
 
 .work-results-table th:nth-child(4),
 .work-results-table td:nth-child(4) {
     min-width: 16rem;
+}
+
+.work-results-table th:nth-child(6),
+.work-results-table td:nth-child(6) {
+    min-width: 24rem;
 }
 
 @media (max-width: 52rem) {

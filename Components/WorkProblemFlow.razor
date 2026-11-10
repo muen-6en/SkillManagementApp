@@ -78,12 +78,14 @@ else if (_phase == FlowPhase.Tasks)
                     var taskIndex = index;
                     var task = _tasks[taskIndex];
                     <li class="work-task-item">
-                        <span class="work-task-item-name">@task.Name</span>
-                        <div class="work-task-item-actions">
+                        <span class="work-task-item-name">
                             @if (IsAssessmentComplete(taskIndex))
                             {
-                                <span class="work-task-complete">確認済み</span>
+                                <span class="work-task-complete" aria-label="確認済み">✓</span>
                             }
+                            @task.Name
+                        </span>
+                        <div class="work-task-item-actions">
                             <button type="button"
                                     class="btn-primary btn-compact"
                                     @onclick="() => StartTaskAssessment(taskIndex)">
@@ -101,7 +103,7 @@ else if (_phase == FlowPhase.Tasks)
             </ol>
         }
 
-        @if (AllAssessmentsComplete())
+        @if (HasAnyCompletedAssessment())
         {
             <div class="form-actions">
                 <button type="button" class="btn-primary" @onclick="ShowResults">
@@ -187,7 +189,6 @@ else
                     <tr>
                         <th scope="col">選択</th>
                         <th scope="col">対象タスク</th>
-                        <th scope="col">抽出した課題</th>
                         <th scope="col">必要そうな能力</th>
                         <th scope="col">スキル候補</th>
                         <th scope="col">優先度</th>
@@ -208,7 +209,6 @@ else
                                 </label>
                             </td>
                             <td>@candidate.TaskNames</td>
-                            <td>@candidate.Issue</td>
                             <td>@candidate.Capability</td>
                             <th scope="row">@candidate.Name</th>
                             <td>@candidate.Priority</td>
@@ -484,6 +484,9 @@ else
         _tasks.Count > 0 &&
         _tasks.Select((_, index) => index).All(IsAssessmentComplete);
 
+    private bool HasAnyCompletedAssessment() =>
+        _tasks.Select((_, index) => index).Any(IsAssessmentComplete);
+
     private async Task CompleteCurrentAssessment()
     {
         _assessmentError = null;
@@ -553,11 +556,9 @@ else
     private async Task ShowResults()
     {
         _assessmentError = null;
-        var incompleteIndex = _assessments.FindIndex(assessment =>
-            AssessmentQuestions.Any(question => string.IsNullOrEmpty(GetValue(assessment, question.Key))));
-        if (incompleteIndex >= 0)
+        if (!HasAnyCompletedAssessment())
         {
-            _assessmentError = $"「{_tasks[incompleteIndex].Name}」の質問にすべて回答してください。";
+            _assessmentError = "課題を確認済みのタスクを1つ以上作成してください。";
             return;
         }
 
@@ -603,8 +604,8 @@ else
         string reason)
     {
         var matchedTasks = _tasks
-            .Select((task, index) => (task, assessment: _assessments[index]))
-            .Where(item => predicate(item.assessment))
+            .Select((task, index) => (task, assessment: _assessments[index], index))
+            .Where(item => IsAssessmentComplete(item.index) && predicate(item.assessment))
             .Select(item => item.task.Name)
             .ToList();
         if (matchedTasks.Count == 0)

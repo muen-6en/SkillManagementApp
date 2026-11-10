@@ -99,7 +99,8 @@ using (var scope = app.Services.CreateScope())
             Id INTEGER NOT NULL CONSTRAINT PK_SkillSuggestionDrafts PRIMARY KEY,
             EntryPoint TEXT NOT NULL,
             StartDate TEXT NOT NULL,
-            EndDate TEXT NULL
+            EndDate TEXT NULL,
+            PeriodLabel TEXT NOT NULL DEFAULT ''
         );
         CREATE TABLE IF NOT EXISTS SkillSuggestionTasks (
             Id INTEGER NOT NULL CONSTRAINT PK_SkillSuggestionTasks PRIMARY KEY AUTOINCREMENT,
@@ -115,6 +116,14 @@ using (var scope = app.Services.CreateScope())
         );
         CREATE INDEX IF NOT EXISTS IX_SkillSuggestionTasks_DraftId ON SkillSuggestionTasks (DraftId);
         """);
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE SkillSuggestionDrafts ADD COLUMN PeriodLabel TEXT NOT NULL DEFAULT '';");
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+    {
+    }
 }
 
 app.UseExceptionHandler("/Error", createScopeForErrors: true);

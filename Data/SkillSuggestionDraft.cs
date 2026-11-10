@@ -10,5 +10,7 @@ public sealed class SkillSuggestionDraft
 
     public string? EndDate { get; set; }
 
+    public string PeriodLabel { get; set; } = string.Empty;
+
     public ICollection<SkillSuggestionTask> Tasks { get; set; } = [];
 }

@@ -1,11 +1,58 @@
 @inject NavigationManager Navigation
 @inject IDbContextFactory<AppDbContext> DbFactory
 
-@if (_phase == FlowPhase.Period)
+@if (_phase == FlowPhase.PeriodList)
+{
+    <section class="panel work-problem-panel" aria-labelledby="work-period-list-heading">
+        <h2 id="work-period-list-heading">タスクを棚卸する期間を選ぶ</h2>
+        <p>登録済みの期間を選ぶか、新しい期間を定義してください。</p>
+        @if (_periods.Count == 0)
+        {
+            <p role="status">登録済みの期間はありません。</p>
+        }
+        else
+        {
+            <ol class="work-period-list">
+                @foreach (var period in _periods)
+                {
+                    <li class="work-period-item">
+                        <div>
+                            <strong>@period.Label</strong>
+                            <span>@period.DateText（タスク @period.TaskCount 件）</span>
+                        </div>
+                        <button type="button" class="btn-primary btn-compact"
+                                @onclick="() => SelectPeriodAsync(period.Id)">
+                            タスクを追加
+                        </button>
+                    </li>
+                }
+            </ol>
+        }
+        <div class="form-actions">
+            <button type="button" class="btn-primary" @onclick="BeginNewPeriod">
+                新しい期間を定義
+            </button>
+            <button type="button" class="btn-secondary" @onclick="Restart">
+                入口を選び直す
+            </button>
+        </div>
+    </section>
+}
+else if (_phase == FlowPhase.Period)
 {
     <section class="panel work-problem-panel" aria-labelledby="work-period-heading">
         <h2 id="work-period-heading">タスクを棚卸する期間を選ぶ</h2>
-        <p>1日だけなら開始日だけ、連続した期間なら終了日も選択してください。</p>
+        <p>期間の名前を付け、1日だけなら開始日だけ、連続した期間なら終了日も選択してください。</p>
+        <div class="form-field">
+            <label for="work-period-label">期間名</label>
+            <input id="work-period-label"
+                   class="form-control"
+                   value="@_periodLabel"
+                   maxlength="200"
+                   placeholder="例: 今週の業務、11月第2週、日次業務"
+                   aria-describedby="work-period-error"
+                   @oninput="eventArgs => _periodLabel = eventArgs.Value?.ToString() ?? string.Empty" />
+        </div>
         <div class="work-period-fields">
             <div class="form-field">
                 <label for="work-period-start">開始日</label>
@@ -31,11 +78,11 @@
             <p id="work-period-error" class="validation-message" role="alert">@_periodError</p>
         }
         <div class="form-actions">
-            <button type="button" class="btn-secondary btn-compact" @onclick="Restart">
-                入口を選び直す
+            <button type="button" class="btn-secondary btn-compact" @onclick="ReturnToPeriodList">
+                期間一覧へ戻る
             </button>
             <button type="button" class="btn-primary" @onclick="ConfirmPeriod">
-                タスクを追加する
+                @(_draftId.HasValue ? "期間を保存" : "タスク追加画面へ")
             </button>
         </div>
     </section>
@@ -44,11 +91,10 @@ else if (_phase == FlowPhase.Tasks)
 {
     <section class="panel work-problem-panel" aria-labelledby="work-tasks-heading">
         <h2 id="work-tasks-heading">仕事内容を整理する</h2>
-        <p>期間: @_periodText</p>
+        <p>期間: @_periodLabel（@_periodText）</p>
         <p>
-            <button type="button" class="btn-secondary btn-compact" @onclick="ChangePeriod">
-                期間を変更
-            </button>
+            <button type="button" class="btn-secondary btn-compact" @onclick="ChangePeriod">期間選択に戻る</button>
+            <button type="button" class="btn-secondary btn-compact" @onclick="EditPeriod">期間を変更</button>
         </p>
         <div class="form-field">
             <label for="work-task-name">タスク名</label>
@@ -121,7 +167,7 @@ else if (_phase == FlowPhase.Assessment
 {
     <section class="panel work-problem-panel" aria-labelledby="work-assessment-heading">
         <h2 id="work-assessment-heading">タスクごとの課題を確認</h2>
-        <p>期間: @_periodText</p>
+        <p>期間: @_periodLabel（@_periodText）</p>
         <p>タスク @_assessmentIndexPlusOne / @_tasks.Count: <strong>@_tasks[_assessmentIndex].Name</strong></p>
         @{
             var currentAssessment = _assessments[_assessmentIndex];
@@ -179,7 +225,7 @@ else
 {
     <section class="panel work-problem-panel" aria-labelledby="work-results-heading">
         <h2 id="work-results-heading">課題とスキル候補</h2>
-        <p>期間: @_periodText</p>
+        <p>期間: @_periodLabel（@_periodText）</p>
         <p>タスクごとの課題を確認し、必要なスキル候補を選択してください。</p>
 
         <div class="diff-table-wrap">
@@ -235,6 +281,7 @@ else
 @code {
     private enum FlowPhase
     {
+        PeriodList,
         Period,
         Tasks,
         Assessment,
@@ -264,6 +311,8 @@ else
 
     private sealed record AssessmentQuestion(string Key, string Label, IReadOnlyList<string> Options);
 
+    private sealed record PeriodSummary(int Id, string Label, string DateText, int TaskCount);
+
     private sealed record WorkCandidate(
         string Name,
         string TaskNames,
@@ -288,10 +337,13 @@ else
     private readonly List<WorkTaskAssessment> _assessments = [];
     private readonly List<WorkCandidate> _candidates = [];
     private readonly HashSet<string> _selectedCandidates = [];
+    private readonly List<PeriodSummary> _periods = [];
     private FlowPhase _phase;
+    private int? _draftId;
     private int _assessmentIndex;
     private string _startDate = string.Empty;
     private string _endDate = string.Empty;
+    private string _periodLabel = string.Empty;
     private string _taskName = string.Empty;
     private string? _periodError;
     private string? _taskError;
@@ -301,23 +353,56 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDraftAsync();
+        await LoadPeriodListAsync();
     }
 
-    private async Task LoadDraftAsync()
+    private async Task LoadPeriodListAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var drafts = await db.SkillSuggestionDrafts
+            .AsNoTracking()
+            .Where(item => item.EntryPoint == SkillSuggestionCatalog.WorkProblems)
+            .Include(item => item.Tasks)
+            .OrderByDescending(item => item.Id)
+            .ToListAsync();
+
+        _periods.Clear();
+        _periods.AddRange(drafts.Select(draft => new PeriodSummary(
+            draft.Id,
+            string.IsNullOrWhiteSpace(draft.PeriodLabel) ? "名称未設定" : draft.PeriodLabel,
+            string.IsNullOrWhiteSpace(draft.EndDate)
+                ? FormatDate(draft.StartDate)
+                : $"{FormatDate(draft.StartDate)}〜{FormatDate(draft.EndDate!)}",
+            draft.Tasks.Count)));
+        _phase = FlowPhase.PeriodList;
+    }
+
+    private void BeginNewPeriod()
+    {
+        _draftId = null;
+        _startDate = string.Empty;
+        _endDate = string.Empty;
+        _periodLabel = string.Empty;
+        _periodError = null;
+        _phase = FlowPhase.Period;
+    }
+
+    private async Task SelectPeriodAsync(int draftId)
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         var draft = await db.SkillSuggestionDrafts
             .AsNoTracking()
             .Include(item => item.Tasks)
-            .FirstOrDefaultAsync(item => item.Id == 1);
-        if (draft is null || !string.Equals(draft.EntryPoint, SkillSuggestionCatalog.WorkProblems, StringComparison.Ordinal))
+            .FirstOrDefaultAsync(item => item.Id == draftId);
+        if (draft is null)
         {
             return;
         }
 
+        _draftId = draft.Id;
         _startDate = draft.StartDate;
         _endDate = draft.EndDate ?? string.Empty;
+        _periodLabel = draft.PeriodLabel;
         _periodText = string.IsNullOrWhiteSpace(_endDate)
             ? FormatDate(draft.StartDate)
             : $"{FormatDate(draft.StartDate)}〜{FormatDate(draft.EndDate!)}";
@@ -330,7 +415,7 @@ else
             Rework = task.Rework,
             Improvement = task.Improvement,
         }));
-        _phase = _tasks.Count > 0 ? FlowPhase.Tasks : FlowPhase.Period;
+        _phase = FlowPhase.Tasks;
     }
 
     private static string FormatDate(string value) =>
@@ -338,9 +423,27 @@ else
 
     private async Task Restart() => await OnRestart.InvokeAsync();
 
+    private async Task ReturnToPeriodList()
+    {
+        await LoadPeriodListAsync();
+    }
+
+    private void EditPeriod()
+    {
+        _periodError = null;
+        _phase = FlowPhase.Period;
+    }
+
     private async Task ConfirmPeriod()
     {
         _periodError = null;
+        _periodLabel = _periodLabel.Trim();
+        if (string.IsNullOrEmpty(_periodLabel))
+        {
+            _periodError = "期間名を入力してください。";
+            return;
+        }
+
         if (!DateOnly.TryParse(_startDate, out var start))
         {
             _periodError = "開始日を選択してください。";
@@ -367,21 +470,20 @@ else
         }
 
         await SaveDraftPeriodAsync();
-        await LoadDraftAsync();
+        await SelectPeriodAsync(_draftId!.Value);
         _phase = FlowPhase.Tasks;
     }
 
     private async Task SaveDraftPeriodAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        var draft = await db.SkillSuggestionDrafts
-            .Include(item => item.Tasks)
-            .FirstOrDefaultAsync(item => item.Id == 1);
+        var draft = _draftId is int draftId
+            ? await db.SkillSuggestionDrafts.FirstOrDefaultAsync(item => item.Id == draftId)
+            : null;
         if (draft is null)
         {
             draft = new SkillSuggestionDraft
             {
-                Id = 1,
                 EntryPoint = SkillSuggestionCatalog.WorkProblems,
             };
             db.SkillSuggestionDrafts.Add(draft);
@@ -389,7 +491,9 @@ else
 
         draft.StartDate = _startDate;
         draft.EndDate = string.IsNullOrWhiteSpace(_endDate) ? null : _endDate;
+        draft.PeriodLabel = _periodLabel;
         await db.SaveChangesAsync();
+        _draftId = draft.Id;
     }
 
     private async Task ChangePeriod()
@@ -399,7 +503,7 @@ else
         _candidates.Clear();
         _selectedCandidates.Clear();
         _taskName = string.Empty;
-        _phase = FlowPhase.Period;
+        await LoadPeriodListAsync();
     }
 
     private async Task AddTaskAsync()

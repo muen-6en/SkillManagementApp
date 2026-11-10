@@ -171,6 +171,10 @@ public sealed class AppDbContext : DbContext
 
             entity.Property(draft => draft.EndDate)
                 .HasMaxLength(10);
+
+            entity.Property(draft => draft.PeriodLabel)
+                .IsRequired()
+                .HasMaxLength(200);
         });
 
         modelBuilder.Entity<SkillSuggestionTask>(entity =>

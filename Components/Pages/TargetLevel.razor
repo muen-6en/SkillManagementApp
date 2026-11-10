@@ -1,38 +1,38 @@
 @page "/skills/{SkillId:int}/cycles/{CycleId:int}/target"
 @inject IDbContextFactory<AppDbContext> DbFactory
 
-<PageTitle>@AppRoutes.PageTitle("到達レベル")</PageTitle>
+<PageTitle>@AppRoutes.PageTitle("目標のレベル")</PageTitle>
 
 @if (_invalid)
 {
-    <CycleStageNav StageTitle="到達レベル"
+    <CycleStageNav StageTitle="目標のレベル"
                    IntermediateItems="@TargetLevelBreadcrumbs" />
-    <h1>到達レベル</h1>
+    <h1>目標のレベル</h1>
     <p role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
 }
 else if (_skill is not null && _cycle is not null)
 {
-    <CycleStageNav StageTitle="到達レベル"
+    <CycleStageNav StageTitle="目標のレベル"
                    IntermediateItems="@TargetLevelBreadcrumbs" />
 
     <CycleSequenceLabel Sequence="@_cycle.Sequence" />
-    <h1>到達レベル</h1>
+    <h1>目標のレベル</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
-    <p>スキル: <strong>@_skill.Name</strong></p>
-    <p>サイクル @_cycle.Sequence で、到達したいレベルを選びます。</p>
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
+    <p>サイクル @_cycle.Sequence で、目標のレベルを選びます。</p>
 
     @if (_isTargetLevelSaved)
     {
-        <p class="status status-success" role="status">到達レベルは保存済みです。</p>
+        <p class="status status-success" role="status">目標のレベルは保存済みです。</p>
     }
     else
     {
-        <p class="status status-info" role="status">到達レベルはまだ保存されていません。</p>
+        <p class="status status-info" role="status">目標のレベルはまだ保存されていません。</p>
     }
 
     <EditForm Model="_form" FormName="saveTargetLevel" OnSubmit="SaveAsync">
         <fieldset class="level-fieldset">
-            <legend>到達レベル（5段階から1つ選ぶ）</legend>
+            <legend>目標のレベル（5段階から1つ選ぶ）</legend>
             <InputRadioGroup @bind-Value="_form.SelectedLevel" Name="target-level">
                 @foreach (var level in LearningLevels.All)
                 {
@@ -59,7 +59,20 @@ else if (_skill is not null && _cycle is not null)
         {
             <p class="status status-success" role="status">@_saveStatus</p>
         }
-        <button type="submit" class="btn-save cycle-form-submit">到達レベルを保存</button>
+        <div class="form-actions cycle-form-submit">
+            <a class="btn-back cycle-next-button"
+               href="@CycleRoutes.Current(SkillId, CycleId)">
+                現在のレベル設定に戻る
+            </a>
+            <button type="submit" class="btn-save">目標のレベルを保存</button>
+            @if (_isTargetLevelSaved)
+            {
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Period(SkillId, CycleId)">
+                    サイクル期間を設定
+                </a>
+            }
+        </div>
     </EditForm>
 }
 
@@ -115,7 +128,7 @@ else if (_skill is not null && _cycle is not null)
         var selectedLevel = _form.SelectedLevel;
         if (!LearningLevels.IsValid(selectedLevel))
         {
-            _levelError = "到達レベルを1つ選んでから保存してください。";
+            _levelError = "目標のレベルを1つ選んでから保存してください。";
             return;
         }
 
@@ -132,7 +145,7 @@ else if (_skill is not null && _cycle is not null)
             cycle.TargetLevel = selectedLevel;
             await db.SaveChangesAsync();
             _isTargetLevelSaved = true;
-            _saveStatus = "到達レベルを保存しました。";
+            _saveStatus = "目標のレベルを保存しました。";
         }
         catch (Exception)
         {

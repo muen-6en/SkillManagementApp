@@ -57,6 +57,10 @@ public sealed class AppDbContext : DbContext
             entity.Property(cycle => cycle.TargetLevel)
                 .HasMaxLength(64);
 
+            entity.Property(cycle => cycle.StartDate);
+
+            entity.Property(cycle => cycle.EndDate);
+
             entity.HasIndex(cycle => new { cycle.SkillId, cycle.Sequence });
 
             entity.HasOne(cycle => cycle.Skill)

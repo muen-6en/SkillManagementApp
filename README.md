@@ -10,7 +10,7 @@
 - スキル選定アシスタント
 - 学習サイクルの記録
   - 現状
-  - 到達レベル
+  - 目標のレベル
   - 実践
   - ふりかえり
 - サイクルごとの差分確認
@@ -50,7 +50,7 @@ dotnet run --urls http://localhost:5079
 | スキル棚卸 | `/skills` | スキル・タグの登録と管理 |
 | スキル選定 | `/skills/suggest` | 仕事のタスクから身に着けるスキル候補を整理 |
 | 現状 | `/skills/{skillId}/cycles/{cycleId}/current` | 現在のレベルを登録 |
-| 到達レベル | `/skills/{skillId}/cycles/{cycleId}/target` | 目標レベルを登録 |
+| 目標のレベル | `/skills/{skillId}/cycles/{cycleId}/target` | 目標のレベルを登録 |
 | 実践 | `/skills/{skillId}/cycles/{cycleId}/practice` | やることと実践記録を登録 |
 | ふりかえり | `/skills/{skillId}/cycles/{cycleId}/reflection` | ふりかえりと次サイクルを登録 |
 | 差分 | `/skills/{skillId}/cycles/{cycleId}/diff` | 前回と今回の設定を比較 |
@@ -63,7 +63,7 @@ dotnet run --urls http://localhost:5079
 3. スキル名を入力して追加する。
 4. 必要に応じてタグを追加する。
 5. 「編集」から現状を登録する。
-6. 「到達目標へ進む」またはパンくずから到達レベルを登録する。
+6. 「目標のレベルへ進む」またはパンくずから目標のレベルを登録する。
 7. 実践画面で「やること」を保存する。
 8. 実際に行った内容を実践記録として追加する。
 9. ふりかえりを保存し、必要なら次のサイクルを作成する。
@@ -92,7 +92,7 @@ dotnet run --urls http://localhost:5079
 
 ## 学習の5段階
 
-現状と到達レベルでは、次の5段階から選択します。
+現状と目標のレベルでは、次の5段階から選択します。
 
 1. 無意識的無能: 知らないし、できない
 2. 意識的無能: 知っていても、できない

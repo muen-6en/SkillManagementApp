@@ -1,0 +1,153 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/action"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("やること")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="やること" />
+    <h1>やること</h1>
+    <p class="validation-message" role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="やること" />
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>やること</h1>
+    <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
+    <p>この期間中に実現できる取り組みを、箇条書きで複数記載してください。</p>
+
+    @if (_isSaved)
+    {
+        <p class="status status-success" role="status">やることは保存済みです。</p>
+    }
+    else
+    {
+        <p class="status status-info" role="status">やることはまだ保存されていません。</p>
+    }
+
+    <EditForm Model="_form" FormName="saveCycleAction" OnSubmit="SaveAsync">
+        <div class="form-field">
+            <label for="cycle-action-body">やること</label>
+            <InputTextArea id="cycle-action-body"
+                           class="form-control form-control-multiline"
+                           @bind-Value="_form.Body"
+                           maxlength="4000"
+                           rows="6"
+                           aria-describedby="cycle-action-error cycle-action-status"
+                           aria-invalid="@(_actionError is not null)" />
+            @if (_actionError is not null)
+            {
+                <p id="cycle-action-error" class="validation-message" role="alert">@_actionError</p>
+            }
+        </div>
+        @if (_saveStatus is not null)
+        {
+            <p id="cycle-action-status" class="status status-success" role="status">@_saveStatus</p>
+        }
+        <div class="form-actions cycle-form-submit">
+            <a class="btn-back cycle-next-button"
+               href="@CycleRoutes.Period(SkillId, CycleId)">
+                サイクル期間に戻る
+            </a>
+            <button type="submit" class="btn-save">やることを保存</button>
+            @if (_isSaved)
+            {
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Practice(SkillId, CycleId)">
+                    実践記録へ進む
+                </a>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private bool _invalid;
+    private bool _isSaved;
+    private string? _actionError;
+    private string? _saveStatus;
+    private readonly ActionForm _form = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _isSaved = false;
+        _actionError = null;
+        _saveStatus = null;
+        _form.Body = string.Empty;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+        var action = await db.CycleActions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == CycleId);
+        if (action is not null)
+        {
+            _form.Body = action.Body;
+            _isSaved = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _actionError = null;
+        _saveStatus = null;
+        var body = _form.Body.Trim();
+        if (string.IsNullOrEmpty(body))
+        {
+            _actionError = "やることを入力してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var action = await db.CycleActions.FirstOrDefaultAsync(item => item.CycleId == CycleId);
+            if (action is null)
+            {
+                db.CycleActions.Add(new SkillManagementApp.Data.CycleAction
+                {
+                    CycleId = CycleId,
+                    Body = body,
+                });
+            }
+            else
+            {
+                action.Body = body;
+            }
+
+            await db.SaveChangesAsync();
+            _form.Body = body;
+            _isSaved = true;
+            _saveStatus = "やることを保存しました。";
+        }
+        catch (Exception)
+        {
+            _actionError = "保存に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private sealed class ActionForm
+    {
+        public string Body { get; set; } = string.Empty;
+    }
+}

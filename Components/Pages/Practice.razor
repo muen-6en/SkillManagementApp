@@ -16,13 +16,13 @@ else if (_skill is not null && _cycle is not null)
     <CycleSequenceLabel Sequence="@_cycle.Sequence" />
     <h1>実践</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
-    <p>スキル: <strong>@_skill.Name</strong></p>
-    <p>サイクル @_cycle.Sequence で、到達レベルに合わせたやることを決め、やったことを記録します。</p>
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
+    <p>サイクル @_cycle.Sequence で、目標のレベルに合わせたやることを決め、やったことを記録します。</p>
 
     @if (_targetLevel is not null)
     {
         <section class="panel panel-inline" aria-labelledby="target-level-summary-heading">
-            <h2 id="target-level-summary-heading">到達レベル</h2>
+            <h2 id="target-level-summary-heading">目標のレベル</h2>
             <p class="level-name">@_targetLevel.Name</p>
             <p class="level-meaning">@_targetLevel.Meaning</p>
         </section>
@@ -30,7 +30,7 @@ else if (_skill is not null && _cycle is not null)
     else
     {
         <p class="validation-message" role="alert">
-            到達レベルが未設定です。<a href="@CycleRoutes.Target(SkillId, CycleId)">到達レベル画面</a>で先に保存してください。
+            目標のレベルが未設定です。<a href="@CycleRoutes.Target(SkillId, CycleId)">目標のレベル画面</a>で先に保存してください。
         </p>
     }
 
@@ -203,7 +203,7 @@ else if (_skill is not null && _cycle is not null)
 
         if (_targetLevel is null)
         {
-            _actionSaveError = "到達レベルを先に保存してください。";
+            _actionSaveError = "目標のレベルを先に保存してください。";
             return;
         }
 
@@ -220,14 +220,14 @@ else if (_skill is not null && _cycle is not null)
             var cycle = await db.Cycles.AsNoTracking().FirstOrDefaultAsync(item => item.Id == CycleId && item.SkillId == SkillId);
             if (cycle is null || !LearningLevels.IsValid(cycle.TargetLevel))
             {
-                _actionSaveError = "到達レベルを先に保存してください。";
+                _actionSaveError = "目標のレベルを先に保存してください。";
                 return;
             }
 
             var action = await db.CycleActions.FirstOrDefaultAsync(item => item.CycleId == CycleId);
             if (action is null)
             {
-                db.CycleActions.Add(new CycleAction
+                db.CycleActions.Add(new SkillManagementApp.Data.CycleAction
                 {
                     CycleId = CycleId,
                     Body = body,

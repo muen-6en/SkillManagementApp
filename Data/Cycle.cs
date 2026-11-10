@@ -14,5 +14,9 @@ public sealed class Cycle
 
     public string? TargetLevel { get; set; }
 
+    public DateOnly? StartDate { get; set; }
+
+    public DateOnly? EndDate { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

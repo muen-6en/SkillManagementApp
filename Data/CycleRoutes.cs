@@ -8,8 +8,14 @@ public static class CycleRoutes
     public static string Target(int skillId, int cycleId) =>
         $"/skills/{skillId}/cycles/{cycleId}/target";
 
+    public static string Period(int skillId, int cycleId) =>
+        $"/skills/{skillId}/cycles/{cycleId}/period";
+
     public static string Practice(int skillId, int cycleId) =>
         $"/skills/{skillId}/cycles/{cycleId}/practice";
+
+    public static string Action(int skillId, int cycleId) =>
+        $"/skills/{skillId}/cycles/{cycleId}/action";
 
     public static string Reflection(int skillId, int cycleId) =>
         $"/skills/{skillId}/cycles/{cycleId}/reflection";

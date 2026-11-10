@@ -173,6 +173,45 @@ h2 {
     font-size: 1rem;
 }
 
+.cycle-context-summary {
+    margin: 0 0 var(--space-xl);
+    padding: var(--space-m);
+    background: var(--color-status-info-background);
+    border: 1px solid var(--color-status-info-stroke);
+    border-radius: 4px;
+}
+
+.cycle-context-summary h2 {
+    margin-bottom: var(--space-m);
+    font-size: 1rem;
+}
+
+.cycle-context-summary dl {
+    display: grid;
+    gap: var(--space-s) var(--space-m);
+    margin: 0;
+}
+
+.cycle-context-summary dl > div {
+    display: grid;
+    grid-template-columns: minmax(9rem, 12rem) 1fr;
+    gap: var(--space-m);
+    align-items: start;
+}
+
+.cycle-context-summary dt {
+    font-weight: 600;
+}
+
+.cycle-context-summary dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.cycle-context-summary-body {
+    white-space: pre-wrap;
+}
+
 .panel-danger {
     border-color: var(--color-status-danger-stroke);
 }

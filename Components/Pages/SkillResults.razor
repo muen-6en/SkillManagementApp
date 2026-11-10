@@ -13,8 +13,11 @@ else if (_skill is not null)
 {
     <CycleStageNav StageTitle="実績" />
     <h1>実績</h1>
-    <p>スキル: <strong>@_skill.Name</strong></p>
-    <p>サイクルごとの現状・到達レベルと、実践記録の件数を表で見ます。</p>
+    @if (_latestCycle is not null)
+    {
+        <CycleContextSummary Skill="@_skill" Cycle="@_latestCycle" />
+    }
+    <p>サイクルごとの現状・目標のレベルと、実践記録の件数を表で見ます。</p>
 
     @if (_rows.Count == 0)
     {
@@ -29,7 +32,7 @@ else if (_skill is not null)
                     <tr>
                         <th scope="col">サイクルの順</th>
                         <th scope="col">現状</th>
-                        <th scope="col">到達レベル</th>
+                        <th scope="col">目標のレベル</th>
                         <th scope="col">実践記録の件数</th>
                         <th scope="col">操作</th>
                     </tr>
@@ -67,6 +70,7 @@ else if (_skill is not null)
     public int SkillId { get; set; }
 
     private Skill? _skill;
+    private Cycle? _latestCycle;
     private IReadOnlyList<SkillResultRow> _rows = Array.Empty<SkillResultRow>();
     private bool _invalid;
 
@@ -74,6 +78,7 @@ else if (_skill is not null)
     {
         _invalid = false;
         _skill = null;
+        _latestCycle = null;
         _rows = Array.Empty<SkillResultRow>();
 
         await using var db = await DbFactory.CreateDbContextAsync();
@@ -85,6 +90,12 @@ else if (_skill is not null)
         }
 
         _skill = skill;
+        _latestCycle = await db.Cycles
+            .AsNoTracking()
+            .Where(item => item.SkillId == SkillId)
+            .OrderByDescending(item => item.Sequence)
+            .ThenByDescending(item => item.Id)
+            .FirstOrDefaultAsync();
         _rows = await SkillResultsLoader.LoadAsync(db, SkillId);
     }
 

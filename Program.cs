@@ -39,6 +39,8 @@ using (var scope = app.Services.CreateScope())
             Sequence INTEGER NOT NULL,
             CurrentLevel TEXT NULL,
             TargetLevel TEXT NULL,
+            StartDate TEXT NULL,
+            EndDate TEXT NULL,
             CreatedAt TEXT NOT NULL,
             CONSTRAINT FK_Cycles_Skills_SkillId
                 FOREIGN KEY (SkillId) REFERENCES Skills (Id) ON DELETE CASCADE
@@ -120,6 +122,22 @@ using (var scope = app.Services.CreateScope())
     {
         await db.Database.ExecuteSqlRawAsync(
             "ALTER TABLE SkillSuggestionDrafts ADD COLUMN PeriodLabel TEXT NOT NULL DEFAULT '';");
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+    {
+    }
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Cycles ADD COLUMN StartDate TEXT NULL;");
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+    {
+    }
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Cycles ADD COLUMN EndDate TEXT NULL;");
     }
     catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
     {

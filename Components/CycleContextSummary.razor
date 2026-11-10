@@ -1,0 +1,65 @@
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<section class="cycle-context-summary" aria-labelledby="cycle-context-summary-heading">
+    <h2 id="cycle-context-summary-heading">このサイクルの設定</h2>
+    <dl>
+        <div>
+            <dt>スキル</dt>
+            <dd>@Skill.Name</dd>
+        </div>
+        <div>
+            <dt>現在のレベル</dt>
+            <dd>@GetLevelText(Cycle.CurrentLevel)</dd>
+        </div>
+        <div>
+            <dt>目標のレベル</dt>
+            <dd>@GetLevelText(Cycle.TargetLevel)</dd>
+        </div>
+        <div>
+            <dt>サイクル期間</dt>
+            <dd>@FormatPeriod()</dd>
+        </div>
+        <div>
+            <dt>やること記録</dt>
+            <dd class="cycle-context-summary-body">@(_actionBody ?? "未設定")</dd>
+        </div>
+    </dl>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public Skill Skill { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Cycle Cycle { get; set; } = null!;
+
+    private string? _actionBody;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var action = await db.CycleActions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == Cycle.Id);
+
+        _actionBody = string.IsNullOrWhiteSpace(action?.Body)
+            ? null
+            : action.Body;
+    }
+
+    private static string GetLevelText(string? code)
+    {
+        var level = LearningLevels.Find(code);
+        return level is null ? "未設定" : $"{level.Name}（{level.Meaning}）";
+    }
+
+    private string FormatPeriod()
+    {
+        if (Cycle.StartDate is null || Cycle.EndDate is null)
+        {
+            return "未設定";
+        }
+
+        return $"{Cycle.StartDate:yyyy/MM/dd}〜{Cycle.EndDate:yyyy/MM/dd}";
+    }
+}

@@ -1,0 +1,152 @@
+@page "/skills/{SkillId:int}/cycles/{CycleId:int}/period"
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>@AppRoutes.PageTitle("サイクル期間")</PageTitle>
+
+@if (_invalid)
+{
+    <CycleStageNav StageTitle="サイクル期間" />
+    <h1>サイクル期間</h1>
+    <p class="validation-message" role="alert">指定されたスキルまたはサイクルは見つかりませんでした。</p>
+}
+else if (_skill is not null && _cycle is not null)
+{
+    <CycleStageNav StageTitle="サイクル期間" />
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <h1>サイクル期間</h1>
+    <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
+    <p>このサイクルで取り組む期間を設定してください。</p>
+
+    <EditForm Model="_form" FormName="saveCyclePeriod" OnSubmit="SaveAsync">
+        <div class="form-field">
+            <label for="cycle-period-start">開始日</label>
+            <input id="cycle-period-start"
+                   class="form-control"
+                   type="date"
+                   value="@_form.StartDate"
+                   @onchange="eventArgs => _form.StartDate = eventArgs.Value?.ToString() ?? string.Empty"
+                   aria-describedby="cycle-period-error" />
+        </div>
+        <div class="form-field">
+            <label for="cycle-period-end">終了日</label>
+            <input id="cycle-period-end"
+                   class="form-control"
+                   type="date"
+                   value="@_form.EndDate"
+                   @onchange="eventArgs => _form.EndDate = eventArgs.Value?.ToString() ?? string.Empty"
+                   aria-describedby="cycle-period-error" />
+        </div>
+        @if (_periodError is not null)
+        {
+            <p id="cycle-period-error" class="validation-message" role="alert">@_periodError</p>
+        }
+        @if (_saveStatus is not null)
+        {
+            <p class="status status-success" role="status">@_saveStatus</p>
+        }
+        <div class="form-actions cycle-form-submit">
+            <a class="btn-back cycle-next-button"
+               href="@CycleRoutes.Target(SkillId, CycleId)">
+                目標のレベル設定に戻る
+            </a>
+            <button type="submit" class="btn-save">期間を保存</button>
+            @if (_isSaved)
+            {
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Action(SkillId, CycleId)">
+                    やることの記録へ進む
+                </a>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int SkillId { get; set; }
+
+    [Parameter]
+    public int CycleId { get; set; }
+
+    private Skill? _skill;
+    private Cycle? _cycle;
+    private bool _invalid;
+    private bool _isSaved;
+    private string? _periodError;
+    private string? _saveStatus;
+    private readonly CyclePeriodForm _form = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invalid = false;
+        _skill = null;
+        _cycle = null;
+        _periodError = null;
+        _saveStatus = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var context = await CycleOperations.TryGetCycleContextAsync(db, SkillId, CycleId);
+        if (context is null)
+        {
+            _invalid = true;
+            return;
+        }
+
+        (_skill, _cycle) = context.Value;
+        _form.StartDate = _cycle.StartDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        _form.EndDate = _cycle.EndDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        _isSaved = _cycle.StartDate is not null && _cycle.EndDate is not null;
+    }
+
+    private async Task SaveAsync()
+    {
+        _periodError = null;
+        _saveStatus = null;
+
+        if (!DateOnly.TryParse(_form.StartDate, out var start))
+        {
+            _periodError = "開始日を選択してください。";
+            return;
+        }
+
+        if (!DateOnly.TryParse(_form.EndDate, out var end))
+        {
+            _periodError = "終了日を選択してください。";
+            return;
+        }
+
+        if (end < start)
+        {
+            _periodError = "終了日は開始日以降の日付を選択してください。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var cycle = await db.Cycles.FirstOrDefaultAsync(item => item.Id == CycleId && item.SkillId == SkillId);
+            if (cycle is null)
+            {
+                _invalid = true;
+                return;
+            }
+
+            cycle.StartDate = start;
+            cycle.EndDate = end;
+            await db.SaveChangesAsync();
+            _isSaved = true;
+            _saveStatus = "サイクル期間を保存しました。";
+        }
+        catch (Exception)
+        {
+            _periodError = "保存に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private sealed class CyclePeriodForm
+    {
+        public string StartDate { get; set; } = string.Empty;
+        public string EndDate { get; set; } = string.Empty;
+    }
+}

@@ -15,7 +15,7 @@ else if (_skill is not null && _cycle is not null)
 
     <CycleSequenceLabel Sequence="@_cycle.Sequence" />
     <h1>差分</h1>
-    <p>スキル: <strong>@_skill.Name</strong></p>
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
     <p>サイクル @_cycle.Sequence の設定を、直前のサイクルと並べて見ます。</p>
 
     @if (_previousCycle is null)
@@ -42,7 +42,7 @@ else if (_skill is not null && _cycle is not null)
                         <td>@_currentSettings!.CurrentLevelText</td>
                     </tr>
                     <tr>
-                        <th scope="row">到達レベル</th>
+                        <th scope="row">目標のレベル</th>
                         <td>@_previousSettings.TargetLevelText</td>
                         <td>@_currentSettings.TargetLevelText</td>
                     </tr>

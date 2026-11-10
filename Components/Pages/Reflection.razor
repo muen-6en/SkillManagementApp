@@ -17,7 +17,7 @@ else if (_skill is not null && _cycle is not null)
     <CycleSequenceLabel Sequence="@_cycle.Sequence" />
     <h1>ふりかえり</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
-    <p>スキル: <strong>@_skill.Name</strong></p>
+    <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
     <p>サイクル @_cycle.Sequence の振り返りを残し、次のサイクルへ進めます。</p>
 
     @if (_nextCycleId is int nextCycleId)
@@ -32,7 +32,7 @@ else if (_skill is not null && _cycle is not null)
         <p>
             <a class="btn-back cycle-next-button"
                href="@CycleRoutes.Target(SkillId, CycleId)">
-                このサイクルの到達レベルへ戻る
+                このサイクルの目標のレベルへ戻る
             </a>
         </p>
     }

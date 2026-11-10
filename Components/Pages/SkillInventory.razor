@@ -118,6 +118,14 @@
                                     <dt>目標</dt>
                                     <dd>@skill.TargetLevelText</dd>
                                 </div>
+                                <div>
+                                    <dt>サイクル期間</dt>
+                                    <dd>@skill.LatestCyclePeriod</dd>
+                                </div>
+                                <div>
+                                    <dt>やること記録</dt>
+                                    <dd class="cycle-context-summary-body">@skill.LatestActionText</dd>
+                                </div>
                             </dl>
                         </div>
                         <div class="skill-inventory-actions skill-inventory-inset">
@@ -223,6 +231,12 @@
             .GroupBy(cycle => cycle.SkillId)
             .ToDictionary(group => group.Key, group => group.First());
 
+        var latestCycleIds = latestCycleBySkill.Values.Select(cycle => cycle.Id).ToList();
+        var actionByCycle = await db.CycleActions
+            .AsNoTracking()
+            .Where(action => latestCycleIds.Contains(action.CycleId))
+            .ToDictionaryAsync(action => action.CycleId, action => action.Body);
+
         _existingSkills = skills
             .Select(skill => new ExistingSkillItem(
                 skill.Id,
@@ -233,7 +247,13 @@
                     ? cycle.Sequence
                     : 0,
                 cycle is null ? "未設定" : FormatLevelName(cycle.CurrentLevel),
-                cycle is null ? "未設定" : FormatLevelName(cycle.TargetLevel)))
+                cycle is null ? "未設定" : FormatLevelName(cycle.TargetLevel),
+                cycle is null ? "未設定" : FormatPeriod(cycle),
+                cycle is null
+                    ? "未設定"
+                    : actionByCycle.TryGetValue(cycle.Id, out var actionBody) && !string.IsNullOrWhiteSpace(actionBody)
+                        ? actionBody
+                        : "未設定"))
             .ToList();
     }
 
@@ -360,8 +380,15 @@
         IReadOnlyList<SkillTagView> Tags,
         int LatestCycleSequence,
         string CurrentLevelText,
-        string TargetLevelText);
+        string TargetLevelText,
+        string LatestCyclePeriod,
+        string LatestActionText);
 
     private static string FormatLevelName(string? code) =>
         LearningLevels.Find(code)?.Name ?? "未設定";
+
+    private static string FormatPeriod(Cycle cycle) =>
+        cycle.StartDate is null || cycle.EndDate is null
+            ? "未設定"
+            : $"{cycle.StartDate:yyyy/MM/dd}〜{cycle.EndDate:yyyy/MM/dd}";
 }

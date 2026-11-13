@@ -1,6 +1,35 @@
+<nav class="cycle-stage-nav" aria-label="サイクルの項目">
+    <ul class="cycle-stage-nav-list">
+        @foreach (var item in Items)
+        {
+            <li>
+                <NavLink class="cycle-stage-nav-link" href="@item.Href" Match="NavLinkMatch.All">
+                    <span class="cycle-stage-nav-mark" aria-hidden="true"></span>
+                    <span>@item.Label</span>
+                </NavLink>
+            </li>
+        }
+    </ul>
+</nav>
 <p class="cycle-sequence-label">サイクル： @Sequence</p>
 
 @code {
     [Parameter, EditorRequired]
     public int Sequence { get; set; }
+
+    [Parameter, EditorRequired]
+    public int SkillId { get; set; }
+
+    [Parameter, EditorRequired]
+    public int CycleId { get; set; }
+
+    private IReadOnlyList<(string Label, string Href)> Items =>
+    [
+        ("現状", CycleRoutes.Current(SkillId, CycleId)),
+        ("目標", CycleRoutes.Target(SkillId, CycleId)),
+        ("サイクル期間", CycleRoutes.Period(SkillId, CycleId)),
+        ("やること記録", CycleRoutes.Action(SkillId, CycleId)),
+        ("実践記録", CycleRoutes.Practice(SkillId, CycleId)),
+        ("振り返り", CycleRoutes.Reflection(SkillId, CycleId)),
+    ];
 }

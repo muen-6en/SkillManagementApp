@@ -13,7 +13,7 @@ else if (_skill is not null && _cycle is not null)
 {
     <CycleStageNav StageTitle="実践" />
 
-    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" SkillId="@SkillId" CycleId="@CycleId" />
     <h1>実践</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
     <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />

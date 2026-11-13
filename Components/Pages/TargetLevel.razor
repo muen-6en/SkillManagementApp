@@ -15,7 +15,7 @@ else if (_skill is not null && _cycle is not null)
     <CycleStageNav StageTitle="目標のレベル"
                    IntermediateItems="@TargetLevelBreadcrumbs" />
 
-    <CycleSequenceLabel Sequence="@_cycle.Sequence" />
+    <CycleSequenceLabel Sequence="@_cycle.Sequence" SkillId="@SkillId" CycleId="@CycleId" />
     <h1>目標のレベル</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
     <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />

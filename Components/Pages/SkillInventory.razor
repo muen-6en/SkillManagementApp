@@ -265,7 +265,7 @@
                 <tbody>
                     @foreach (var skill in VisibleSkills)
                     {
-                        <tr>
+                        <tr class="@(skill.SkillId == SelectedSkill?.SkillId ? "is-selected" : null)" @onclick="() => SelectSkill(skill.SkillId)">
                             <td>
                                 <input type="radio"
                                        name="inventory-skill"

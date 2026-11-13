@@ -686,6 +686,19 @@ a.skill-action-link {
     text-align: center;
 }
 
+.inventory-table tbody tr {
+    cursor: pointer;
+}
+
+.inventory-table tbody tr.is-selected td,
+.inventory-table tbody tr.is-selected th[scope="row"] {
+    background: var(--color-status-info-background);
+}
+
+.inventory-table tbody tr.is-selected td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-brand-background);
+}
+
 .inventory-filters {
     display: flex;
     flex-wrap: wrap;
@@ -1194,6 +1207,75 @@ a.btn-danger:hover {
 
 .cycle-stage-link {
     margin: 0 0 var(--space-m);
+}
+
+.cycle-stage-nav {
+    margin: 0 0 var(--space-s);
+    padding-bottom: var(--space-s);
+    border-bottom: 1px solid var(--color-neutral-stroke-1);
+}
+
+.cycle-stage-nav-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cycle-stage-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--control-height);
+    color: var(--color-neutral-foreground-2);
+    font-size: var(--control-font-size);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+}
+
+.cycle-stage-nav-link:link,
+.cycle-stage-nav-link:visited {
+    color: var(--color-neutral-foreground-2);
+}
+
+.cycle-stage-nav-link:hover {
+    color: var(--color-brand-background-hover);
+}
+
+.cycle-stage-nav-mark {
+    width: 0.3125rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    background: linear-gradient(
+        180deg,
+        var(--color-brand-background) 0%,
+        var(--color-brand-background-hover) 100%);
+    flex-shrink: 0;
+    opacity: 0;
+    transform: scaleY(0.5);
+}
+
+.cycle-stage-nav-link:hover .cycle-stage-nav-mark {
+    opacity: 0.45;
+    transform: scaleY(0.85);
+}
+
+.cycle-stage-nav-link.active {
+    color: var(--color-neutral-foreground-1);
+}
+
+.cycle-stage-nav-link.active:link,
+.cycle-stage-nav-link.active:visited {
+    color: var(--color-neutral-foreground-1);
+}
+
+.cycle-stage-nav-link.active .cycle-stage-nav-mark {
+    opacity: 1;
+    transform: scaleY(1);
 }
 
 .cycle-sequence-label {

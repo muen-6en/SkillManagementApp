@@ -23,6 +23,33 @@
             <dt>やること記録</dt>
             <dd class="cycle-context-summary-body">@(_actionBody ?? "未設定")</dd>
         </div>
+        <div>
+            <dt>実践記録</dt>
+            <dd>
+                @if (_practiceRecords.Count == 0)
+                {
+                    <span>未設定</span>
+                }
+                else
+                {
+                    <ul class="cycle-context-record-list">
+                        @foreach (var record in _practiceRecords)
+                        {
+                            <li>
+                                <time datetime="@record.RecordedAt.ToString("yyyy-MM-ddTHH:mm:ss")">
+                                    @record.RecordedAt.ToString("yyyy-MM-dd HH:mm")
+                                </time>
+                                <span class="cycle-context-summary-body">@record.Body</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+        </div>
+        <div>
+            <dt>振り返り</dt>
+            <dd>@(_reflectionDone ? "実施済み" : "未実施")</dd>
+        </div>
     </dl>
 </section>
 
@@ -34,6 +61,8 @@
     public Cycle Cycle { get; set; } = null!;
 
     private string? _actionBody;
+    private IReadOnlyList<PracticeRecord> _practiceRecords = Array.Empty<PracticeRecord>();
+    private bool _reflectionDone;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -45,6 +74,16 @@
         _actionBody = string.IsNullOrWhiteSpace(action?.Body)
             ? null
             : action.Body;
+        _practiceRecords = await db.PracticeRecords
+            .AsNoTracking()
+            .Where(record => record.CycleId == Cycle.Id)
+            .OrderByDescending(record => record.RecordedAt)
+            .ThenByDescending(record => record.Id)
+            .ToListAsync();
+        var reflection = await db.ReflectionEntries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == Cycle.Id);
+        _reflectionDone = !string.IsNullOrWhiteSpace(reflection?.Body);
     }
 
     private static string GetLevelText(string? code)

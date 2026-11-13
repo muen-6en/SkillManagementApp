@@ -19,59 +19,6 @@ else if (_skill is not null && _cycle is not null)
     <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
     <p>サイクル @_cycle.Sequence で、目標のレベルに合わせたやることを決め、やったことを記録します。</p>
 
-    @if (_targetLevel is not null)
-    {
-        <section class="panel panel-inline" aria-labelledby="target-level-summary-heading">
-            <h2 id="target-level-summary-heading">目標のレベル</h2>
-            <p class="level-name">@_targetLevel.Name</p>
-            <p class="level-meaning">@_targetLevel.Meaning</p>
-        </section>
-    }
-    else
-    {
-        <p class="validation-message" role="alert">
-            目標のレベルが未設定です。<a href="@CycleRoutes.Target(SkillId, CycleId)">目標のレベル画面</a>で先に保存してください。
-        </p>
-    }
-
-    <section class="panel" aria-labelledby="action-plan-heading">
-        <h2 id="action-plan-heading">やること</h2>
-        @if (_isActionSaved)
-        {
-            <p class="status status-success" role="status">やることは保存済みです。</p>
-        }
-        else
-        {
-            <p class="status status-info" role="status">やることはまだ保存されていません。</p>
-        }
-
-        <EditForm Model="_actionForm" FormName="saveAction" OnSubmit="SaveActionAsync">
-            <div class="form-field">
-                <label for="action-body">やること</label>
-                <InputTextArea id="action-body"
-                               class="form-control form-control-multiline"
-                               @bind-Value="_actionForm.Body"
-                               aria-describedby="action-body-error action-save-status"
-                               aria-invalid="@(_actionError is not null)"
-                               rows="5"
-                               maxlength="4000" />
-                @if (_actionError is not null)
-                {
-                    <p id="action-body-error" class="validation-message" role="alert">@_actionError</p>
-                }
-            </div>
-            @if (_actionSaveError is not null)
-            {
-                <p class="validation-message" role="alert">@_actionSaveError</p>
-            }
-            @if (_actionSaveStatus is not null)
-            {
-                <p id="action-save-status" class="status status-success" role="status">@_actionSaveStatus</p>
-            }
-            <button type="submit" class="btn-save" disabled="@(!_canSaveAction)">やることを保存</button>
-        </EditForm>
-    </section>
-
     <section class="panel" aria-labelledby="practice-records-heading">
         <h2 id="practice-records-heading">実践記録</h2>
         <p>やったことは、やることとは別に複数件残せます。</p>
@@ -118,7 +65,17 @@ else if (_skill is not null && _cycle is not null)
             {
                 <p id="record-save-status" class="status status-success" role="status">@_recordSaveStatus</p>
             }
-            <button type="submit" class="btn-save cycle-form-submit">記録を追加</button>
+            <div class="form-actions cycle-form-submit">
+                <button type="submit" class="btn-save">記録を追加</button>
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Reflection(SkillId, CycleId)">
+                    ふりかえりへ進む
+                </a>
+                <a class="btn-secondary cycle-next-button"
+                   href="@CycleRoutes.Results(SkillId)">
+                    実績確認へ進む
+                </a>
+            </div>
         </EditForm>
     </section>
 }
@@ -132,16 +89,9 @@ else if (_skill is not null && _cycle is not null)
 
     private Skill? _skill;
     private Cycle? _cycle;
-    private LearningLevelDefinition? _targetLevel;
     private bool _invalid;
-    private bool _isActionSaved;
-    private bool _canSaveAction;
     private IReadOnlyList<PracticeRecord> _records = Array.Empty<PracticeRecord>();
-    private readonly ActionForm _actionForm = new();
     private readonly RecordForm _recordForm = new();
-    private string? _actionError;
-    private string? _actionSaveError;
-    private string? _actionSaveStatus;
     private string? _recordError;
     private string? _recordSaveError;
     private string? _recordSaveStatus;
@@ -151,10 +101,6 @@ else if (_skill is not null && _cycle is not null)
         _invalid = false;
         _skill = null;
         _cycle = null;
-        _targetLevel = null;
-        _actionError = null;
-        _actionSaveError = null;
-        _actionSaveStatus = null;
         _recordError = null;
         _recordSaveError = null;
         _recordSaveStatus = null;
@@ -168,21 +114,8 @@ else if (_skill is not null && _cycle is not null)
         }
 
         (_skill, _cycle) = context.Value;
-        _targetLevel = LearningLevels.Find(_cycle.TargetLevel);
-        _canSaveAction = _targetLevel is not null;
 
-        await LoadActionAsync(db);
         await LoadRecordsAsync(db);
-    }
-
-    private async Task LoadActionAsync(AppDbContext db)
-    {
-        var action = await db.CycleActions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.CycleId == CycleId);
-
-        _actionForm.Body = action?.Body ?? string.Empty;
-        _isActionSaved = action is not null && !string.IsNullOrWhiteSpace(action.Body);
     }
 
     private async Task LoadRecordsAsync(AppDbContext db)
@@ -193,59 +126,6 @@ else if (_skill is not null && _cycle is not null)
             .OrderByDescending(record => record.RecordedAt)
             .ThenByDescending(record => record.Id)
             .ToListAsync();
-    }
-
-    private async Task SaveActionAsync()
-    {
-        _actionError = null;
-        _actionSaveError = null;
-        _actionSaveStatus = null;
-
-        if (_targetLevel is null)
-        {
-            _actionSaveError = "目標のレベルを先に保存してください。";
-            return;
-        }
-
-        var body = _actionForm.Body.Trim();
-        if (string.IsNullOrEmpty(body))
-        {
-            _actionError = "やることを入力してください。";
-            return;
-        }
-
-        try
-        {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var cycle = await db.Cycles.AsNoTracking().FirstOrDefaultAsync(item => item.Id == CycleId && item.SkillId == SkillId);
-            if (cycle is null || !LearningLevels.IsValid(cycle.TargetLevel))
-            {
-                _actionSaveError = "目標のレベルを先に保存してください。";
-                return;
-            }
-
-            var action = await db.CycleActions.FirstOrDefaultAsync(item => item.CycleId == CycleId);
-            if (action is null)
-            {
-                db.CycleActions.Add(new SkillManagementApp.Data.CycleAction
-                {
-                    CycleId = CycleId,
-                    Body = body,
-                });
-            }
-            else
-            {
-                action.Body = body;
-            }
-
-            await db.SaveChangesAsync();
-            _isActionSaved = true;
-            _actionSaveStatus = "やることを保存しました。";
-        }
-        catch (Exception)
-        {
-            _actionSaveError = "保存に失敗しました。入力内容はそのまま残っています。";
-        }
     }
 
     private async Task AddRecordAsync()
@@ -282,17 +162,11 @@ else if (_skill is not null && _cycle is not null)
             _recordForm.Body = string.Empty;
             _recordSaveStatus = "記録を追加しました。";
             await LoadRecordsAsync(db);
-            await LoadActionAsync(db);
         }
         catch (Exception)
         {
             _recordSaveError = "記録の追加に失敗しました。入力内容はそのまま残っています。";
         }
-    }
-
-    private sealed class ActionForm
-    {
-        public string Body { get; set; } = string.Empty;
     }
 
     private sealed class RecordForm

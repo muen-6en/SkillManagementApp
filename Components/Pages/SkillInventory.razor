@@ -41,38 +41,14 @@
                 <p id="inventory-name-error" class="validation-message" role="alert">@_addNameError</p>
             }
         </div>
-
         <div class="form-field">
-            <label for="inventory-tag-name">タグ</label>
-            <div class="skill-tag-add-row">
-                <InputText id="inventory-tag-name"
-                           class="form-control skill-tag-input"
-                           @bind-Value="_addForm.TagName"
-                           aria-describedby="inventory-tag-error"
-                           maxlength="64" />
-                <button type="button" class="btn-secondary btn-compact" @onclick="AddPendingTag">タグを追加</button>
-            </div>
-            @if (_addTagError is not null)
-            {
-                <p id="inventory-tag-error" class="validation-message" role="alert">@_addTagError</p>
-            }
-            @if (_pendingTagNames.Count > 0)
-            {
-                <ul class="skill-tag-list skill-tag-list-pending" aria-label="追加するタグ">
-                    @foreach (var tagName in _pendingTagNames)
-                    {
-                        <li class="skill-tag-item">
-                            <span class="skill-tag-label"># @tagName</span>
-                            <button type="button"
-                                    class="skill-tag-remove"
-                                    aria-label="@($"{tagName} のタグを削除")"
-                                    @onclick="() => RemovePendingTag(tagName)">
-                                <span aria-hidden="true">×</span>
-                            </button>
-                        </li>
-                    }
-                </ul>
-            }
+            <label for="inventory-skill-note">備考</label>
+            <p id="inventory-skill-note-help" class="field-help">任意です。スキルの具体的な定義などを入力できます。</p>
+            <InputTextArea id="inventory-skill-note"
+                           class="form-control form-control-multiline"
+                           @bind-Value="_addForm.Note"
+                           aria-describedby="inventory-skill-note-help"
+                           maxlength="1000" />
         </div>
 
         @if (_addSaveError is not null)
@@ -95,75 +71,470 @@
     }
     else
     {
-        <ul class="skill-list skill-inventory-list">
-            @foreach (var skill in _existingSkills)
-            {
-                <li class="skill-inventory-item">
-                    <div class="skill-inventory-row">
-                        <div class="skill-inventory-name-row">
-                            <div class="skill-inventory-head">
-                                <span class="skill-inventory-mark" aria-hidden="true"></span>
-                                <span class="skill-inventory-name">@skill.Name</span>
-                            </div>
-                            <dl class="skill-inventory-cycle-summary">
-                                <div>
-                                    <dt>最新サイクル</dt>
-                                    <dd>@skill.LatestCycleSequence</dd>
-                                </div>
-                                <div>
-                                    <dt>現在のレベル</dt>
-                                    <dd>@skill.CurrentLevelText</dd>
-                                </div>
-                                <div>
-                                    <dt>目標</dt>
-                                    <dd>@skill.TargetLevelText</dd>
-                                </div>
-                                <div>
-                                    <dt>サイクル期間</dt>
-                                    <dd>@skill.LatestCyclePeriod</dd>
-                                </div>
-                                <div>
-                                    <dt>やること記録</dt>
-                                    <dd class="cycle-context-summary-body">@skill.LatestActionText</dd>
-                                </div>
-                            </dl>
-                        </div>
-                        <div class="skill-inventory-actions skill-inventory-inset">
-                            <SkillDisclosureActions SkillId="@skill.SkillId"
-                                                    SkillName="@skill.Name"
-                                                    ResultsHref="@CycleRoutes.Results(skill.SkillId)"
-                                                    OnOpenLearning="@MakeOpenSkillCallback(skill.SkillId)"
-                                                    OnDeleted="@LoadExistingSkillsAsync" />
-                        </div>
-                        <div class="skill-inventory-tag-section skill-inventory-inset">
-                            <SkillTagAdd SkillId="@skill.SkillId"
-                                         SkillName="@skill.Name"
-                                         Tags="@skill.Tags"
-                                         OnTagsChanged="@LoadExistingSkillsAsync" />
-                            <div class="skill-inventory-tags">
-                                <SkillTagList SkillId="@skill.SkillId"
-                                              SkillName="@skill.Name"
-                                              Tags="@skill.Tags"
-                                              OnTagsChanged="@LoadExistingSkillsAsync" />
-                            </div>
-                        </div>
+        @if (SelectedSkill is { } selectedSkill)
+        {
+            var detailId = $"skill-record-{selectedSkill.SkillId}";
+            <button type="button"
+                    class="@($"btn-secondary btn-compact record-toggle inventory-filter-toggle{(_selectedEditorOpen ? " is-open" : "")}")"
+                    aria-expanded="@(_selectedEditorOpen ? "true" : "false")"
+                    aria-controls="inventory-selected"
+                    @onclick="() => _selectedEditorOpen = !_selectedEditorOpen">
+                <svg class="record-toggle-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                    <path d="M7.65 4.15a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L12.44 10 7.65 5.21a.75.75 0 0 1 0-1.06Z" />
+                </svg>
+                <span>@(_selectedEditorOpen ? "スキル編集を閉じる" : "スキル編集")</span>
+            </button>
+            <div id="inventory-selected" class="inventory-selected" aria-labelledby="inventory-selected-heading" hidden="@(!_selectedEditorOpen)">
+                <h3 id="inventory-selected-heading" class="inventory-selected-title">選択したスキルの操作</h3>
+                <fieldset class="inventory-basic-info">
+                    <legend>基本情報</legend>
+                    <p>選択中: <strong>@selectedSkill.Name</strong></p>
+                    @{
+                        SyncNoteDraft(selectedSkill);
+                    }
+                <div class="form-field inventory-note-editor">
+                    <label for="inventory-selected-note">備考</label>
+                    <textarea id="inventory-selected-note"
+                              class="form-control form-control-multiline"
+                              maxlength="1000"
+                              @bind="_noteDraft"
+                              @bind:event="oninput"></textarea>
+                    <button type="button" class="btn-save" @onclick="UpdateNoteAsync">更新</button>
+                    @if (_noteError is not null)
+                    {
+                        <p class="validation-message" role="alert">@_noteError</p>
+                    }
+                    @if (_noteStatus is not null)
+                    {
+                        <p class="status status-success" role="status">@_noteStatus</p>
+                    }
+                </div>
+                </fieldset>
+                <SkillDisclosureActions SkillId="@selectedSkill.SkillId"
+                                        SkillName="@selectedSkill.Name"
+                                        ResultsHref="@CycleRoutes.Results(selectedSkill.SkillId)"
+                                        PracticeHref="@CycleRoutes.Practice(selectedSkill.SkillId, selectedSkill.LatestCycleId)"
+                                        OnOpenLearning="@MakeOpenSkillCallback(selectedSkill.SkillId)"
+                                        OnDeleted="@LoadExistingSkillsAsync" />
+                @if (HasRecord(selectedSkill))
+                {
+                    <button type="button"
+                            class="@($"btn-secondary btn-compact record-toggle{(_openRecordSkillId == selectedSkill.SkillId ? " is-open" : "")}")"
+                            aria-expanded="@(_openRecordSkillId == selectedSkill.SkillId ? "true" : "false")"
+                            aria-controls="@detailId"
+                            @onclick="() => ToggleRecord(selectedSkill.SkillId)">
+                        <svg class="record-toggle-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M7.65 4.15a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L12.44 10 7.65 5.21a.75.75 0 0 1 0-1.06Z" />
+                        </svg>
+                        <span>@(_openRecordSkillId == selectedSkill.SkillId ? "記録を閉じる" : "記録を見る")</span>
+                    </button>
+                }
+                @if (_openRecordSkillId == selectedSkill.SkillId)
+                {
+                    <div id="@detailId">
+                        <h4>@selectedSkill.Name の記録</h4>
+                        <section class="inventory-record-block">
+                            <h5>備考</h5>
+                            <p class="cycle-context-summary-body">@(string.IsNullOrWhiteSpace(selectedSkill.Note) ? "未設定" : selectedSkill.Note)</p>
+                        </section>
+                        <section class="inventory-record-block">
+                            <h5>やること記録</h5>
+                            <p class="cycle-context-summary-body">@selectedSkill.LatestActionText</p>
+                        </section>
+                        <section class="inventory-record-block">
+                            <h5>実践記録</h5>
+                            <p class="cycle-context-summary-body">@selectedSkill.LatestPracticeText</p>
+                        </section>
                     </div>
-                </li>
-            }
-        </ul>
+                }
+                <div class="inventory-registered-tags">
+                    @if (selectedSkill.Tags.Count > 0)
+                    {
+                        <p class="inventory-registered-tags-label">登録済みタグ：</p>
+                    }
+                    <SkillTagList SkillId="@selectedSkill.SkillId"
+                                  SkillName="@selectedSkill.Name"
+                                  Tags="@selectedSkill.Tags"
+                                  OnTagsChanged="@LoadExistingSkillsAsync" />
+                </div>
+                <SkillTagAdd SkillId="@selectedSkill.SkillId"
+                             SkillName="@selectedSkill.Name"
+                             Tags="@selectedSkill.Tags"
+                             OnTagsChanged="@LoadExistingSkillsAsync" />
+            </div>
+        }
+        <button type="button"
+                class="@($"btn-secondary btn-compact record-toggle inventory-filter-toggle{(_filtersOpen ? " is-open" : "")}")"
+                aria-expanded="@(_filtersOpen ? "true" : "false")"
+                aria-controls="inventory-filters"
+                @onclick="() => _filtersOpen = !_filtersOpen">
+            <svg class="record-toggle-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M7.65 4.15a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L12.44 10 7.65 5.21a.75.75 0 0 1 0-1.06Z" />
+            </svg>
+            <span>@(_filtersOpen ? "絞り込みを閉じる" : "絞り込み")</span>
+        </button>
+        <fieldset id="inventory-filters" class="inventory-filters" hidden="@(!_filtersOpen)">
+            <legend>絞り込み</legend>
+            <div class="form-field">
+                <label for="filter-skill-name">スキル名</label>
+                <input id="filter-skill-name" class="form-control" @bind="_filterSkillName" @bind:event="oninput" maxlength="64" />
+            </div>
+            <div class="form-field">
+                <label for="filter-current-level">現在のレベル</label>
+                <select id="filter-current-level" class="form-control" @bind="_filterCurrentLevel">
+                    <option value="">すべて</option>
+                    @foreach (var level in LearningLevels.All)
+                    {
+                        <option value="@level.Name">@level.Rank @level.Name</option>
+                    }
+                    <option value="未設定">未設定</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="filter-target-level">目標</label>
+                <select id="filter-target-level" class="form-control" @bind="_filterTargetLevel">
+                    <option value="">すべて</option>
+                    @foreach (var level in LearningLevels.All)
+                    {
+                        <option value="@level.Name">@level.Rank @level.Name</option>
+                    }
+                    <option value="未設定">未設定</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="filter-action">やること記録</label>
+                <select id="filter-action" class="form-control" @bind="_filterAction">
+                    <option value="">すべて</option>
+                    <option value="あり">あり</option>
+                    <option value="なし">なし</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="filter-practice">実践記録</label>
+                <select id="filter-practice" class="form-control" @bind="_filterPractice">
+                    <option value="">すべて</option>
+                    <option value="あり">あり</option>
+                    <option value="なし">なし</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="filter-reflection">振り返り</label>
+                <select id="filter-reflection" class="form-control" @bind="_filterReflection">
+                    <option value="">すべて</option>
+                    <option value="実施済み">実施済み</option>
+                    <option value="未実施">未実施</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="filter-tag">タグ</label>
+                <input id="filter-tag" class="form-control" @bind="_filterTag" @bind:event="oninput" maxlength="64" />
+            </div>
+            <fieldset class="inventory-period-filter">
+                <legend>期間</legend>
+                <div class="form-field">
+                    <label for="filter-period-start">開始日</label>
+                    <InputDate id="filter-period-start" class="form-control" @bind-Value="_filterPeriodStart" />
+                </div>
+                <div class="form-field">
+                    <label for="filter-period-end">終了日</label>
+                    <InputDate id="filter-period-end" class="form-control" @bind-Value="_filterPeriodEnd" />
+                </div>
+                @if (PeriodRangeInvalid)
+                {
+                    <p class="validation-message" role="alert">開始日は終了日以前にしてください。</p>
+                }
+            </fieldset>
+        </fieldset>
+        <div class="diff-table-wrap">
+            <table class="diff-table inventory-table">
+                <caption class="visually-hidden">登録済みスキルの状況</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">選択</th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Name)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Name)">スキル名</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Cycle)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Cycle)">サイクル</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Current)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Current)">現在</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Target)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Target)">目標</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Period)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Period)">期間</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Action)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Action)">行動</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Practice)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Practice)">実績</button></th>
+                        <th scope="col" aria-sort="@SortState(InventorySortColumn.Reflection)"><button type="button" class="table-sort" @onclick="() => SortBy(InventorySortColumn.Reflection)">振り返り</button></th>
+                        <th scope="col">タグ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var skill in VisibleSkills)
+                    {
+                        <tr>
+                            <td>
+                                <input type="radio"
+                                       name="inventory-skill"
+                                       checked="@(skill.SkillId == SelectedSkill?.SkillId)"
+                                       @onchange="() => SelectSkill(skill.SkillId)"
+                                       aria-label="@($"{skill.Name} を選択")" />
+                            </td>
+                            <th scope="row">@skill.Name</th>
+                            <td>@CycleNumber(skill.LatestCycleSequence)</td>
+                            <td><span aria-label="@skill.CurrentLevelText">@LevelNumber(skill.CurrentLevelText)</span></td>
+                            <td><span aria-label="@skill.TargetLevelText">@LevelNumber(skill.TargetLevelText)</span></td>
+                            <td>@DashIfUnset(skill.LatestCyclePeriod)</td>
+                            <td>@PresenceText(skill.LatestActionText)</td>
+                            <td>@PresenceText(skill.LatestPracticeText)</td>
+                            <td>@skill.LatestReflectionStatus</td>
+                            <td>
+                                @if (skill.Tags.Count == 0)
+                                {
+                                    <span>なし</span>
+                                }
+                                else
+                                {
+                                    <ul class="inventory-tag-notes">
+                                        @foreach (var tag in skill.Tags)
+                                        {
+                                            <li>@tag.Name</li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (!VisibleSkills.Any())
+        {
+            <p class="status status-info" role="status">条件に合うスキルはありません。</p>
+        }
     }
 </section>
 
 @code {
     private readonly AddSkillForm _addForm = new();
-    private readonly List<string> _pendingTagNames = [];
     private readonly List<string> _suggestedSkillNames = [];
     private IReadOnlyList<ExistingSkillItem> _existingSkills = Array.Empty<ExistingSkillItem>();
     private string? _addNameError;
-    private string? _addTagError;
     private string? _addSaveError;
     private string? _addSaveStatus;
     private string? _openError;
+    private int _noteSkillId;
+    private string _noteDraft = string.Empty;
+    private string? _noteError;
+    private string? _noteStatus;
+    private string _filterSkillName = string.Empty;
+    private string _filterCurrentLevel = string.Empty;
+    private string _filterTargetLevel = string.Empty;
+    private string _filterAction = string.Empty;
+    private string _filterPractice = string.Empty;
+    private string _filterReflection = string.Empty;
+    private string _filterTag = string.Empty;
+    private DateOnly? _filterPeriodStart;
+    private DateOnly? _filterPeriodEnd;
+    private InventorySortColumn _sortColumn = InventorySortColumn.Name;
+    private bool _sortDescending;
+    private int? _openRecordSkillId;
+    private bool _filtersOpen;
+    private bool _selectedEditorOpen;
+    private int _selectedSkillId;
+
+    private ExistingSkillItem? SelectedSkill =>
+        VisibleSkills.FirstOrDefault(skill => skill.SkillId == _selectedSkillId)
+        ?? VisibleSkills.FirstOrDefault();
+
+    private void SelectSkill(int skillId) => _selectedSkillId = skillId;
+
+    private void SyncNoteDraft(ExistingSkillItem skill)
+    {
+        if (_noteSkillId == skill.SkillId)
+        {
+            return;
+        }
+
+        _noteSkillId = skill.SkillId;
+        _noteDraft = skill.Note;
+        _noteError = null;
+        _noteStatus = null;
+    }
+
+    private async Task UpdateNoteAsync()
+    {
+        _noteError = null;
+        _noteStatus = null;
+        var skillId = _noteSkillId;
+        var note = _noteDraft.Trim();
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skill = await db.Skills.FirstOrDefaultAsync(item => item.Id == skillId);
+            if (skill is null)
+            {
+                _noteError = "更新できませんでした。";
+                await LoadExistingSkillsAsync();
+                return;
+            }
+
+            skill.Note = note;
+            await db.SaveChangesAsync();
+            await LoadExistingSkillsAsync();
+            _noteDraft = note;
+            _noteStatus = "備考を更新しました。";
+        }
+        catch (Exception)
+        {
+            _noteError = "備考の更新に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private IEnumerable<ExistingSkillItem> VisibleSkills
+    {
+        get
+        {
+            var filtered = _existingSkills.Where(MatchesFilter);
+            return _sortDescending
+                ? filtered.OrderByDescending(SortKey).ThenBy(skill => skill.Name, StringComparer.Ordinal)
+                : filtered.OrderBy(SortKey).ThenBy(skill => skill.Name, StringComparer.Ordinal);
+        }
+    }
+
+    private bool MatchesFilter(ExistingSkillItem skill)
+    {
+        var skillName = _filterSkillName.Trim();
+        if (!string.IsNullOrEmpty(skillName)
+            && !skill.Name.Contains(skillName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_filterCurrentLevel) && skill.CurrentLevelText != _filterCurrentLevel)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_filterTargetLevel) && skill.TargetLevelText != _filterTargetLevel)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_filterAction) && PresenceText(skill.LatestActionText) != _filterAction)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_filterPractice) && PresenceText(skill.LatestPracticeText) != _filterPractice)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_filterReflection) && skill.LatestReflectionStatus != _filterReflection)
+        {
+            return false;
+        }
+
+        var tag = _filterTag.Trim();
+        if (!string.IsNullOrEmpty(tag)
+            && !skill.Tags.Any(item => item.Name.Contains(tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        return PeriodRangeInvalid || PeriodContains(skill);
+    }
+
+    private bool PeriodRangeInvalid =>
+        _filterPeriodStart is DateOnly start && _filterPeriodEnd is DateOnly end && start > end;
+
+    private bool PeriodContains(ExistingSkillItem skill)
+    {
+        if (_filterPeriodStart is null && _filterPeriodEnd is null)
+        {
+            return true;
+        }
+
+        if (skill.PeriodStart is not DateOnly periodStart || skill.PeriodEnd is not DateOnly periodEnd)
+        {
+            return false;
+        }
+
+        if (_filterPeriodStart is DateOnly filterStart
+            && (periodStart > filterStart || periodEnd < filterStart))
+        {
+            return false;
+        }
+
+        return _filterPeriodEnd is not DateOnly filterEnd
+            || (periodStart <= filterEnd && periodEnd >= filterEnd);
+    }
+
+    private object SortKey(ExistingSkillItem skill) => _sortColumn switch
+    {
+        InventorySortColumn.Cycle => skill.LatestCycleSequence,
+        InventorySortColumn.Current => LevelRank(skill.CurrentLevelText),
+        InventorySortColumn.Target => LevelRank(skill.TargetLevelText),
+        InventorySortColumn.Period => skill.LatestCyclePeriod == "未設定" ? "9999" : skill.LatestCyclePeriod,
+        InventorySortColumn.Action => PresenceText(skill.LatestActionText),
+        InventorySortColumn.Practice => PresenceText(skill.LatestPracticeText),
+        InventorySortColumn.Reflection => skill.LatestReflectionStatus,
+        _ => skill.Name,
+    };
+
+    private void SortBy(InventorySortColumn column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDescending = false;
+        }
+    }
+
+    private string SortState(InventorySortColumn column)
+    {
+        if (_sortColumn != column)
+        {
+            return "none";
+        }
+
+        return _sortDescending ? "descending" : "ascending";
+    }
+
+    private void ToggleRecord(int skillId)
+    {
+        _openRecordSkillId = _openRecordSkillId == skillId ? null : skillId;
+    }
+
+    private static bool HasRecord(ExistingSkillItem skill) =>
+        HasText(skill.LatestActionText) || HasText(skill.LatestPracticeText) || HasText(skill.Note);
+
+    private static string PresenceText(string value) => HasText(value) ? "あり" : "なし";
+
+    private static bool HasText(string value) =>
+        !string.IsNullOrWhiteSpace(value) && value != "未設定";
+
+    private static int LevelRank(string name) =>
+        LearningLevels.All.FirstOrDefault(level => level.Name == name)?.Rank ?? int.MaxValue;
+
+    private static string LevelNumber(string name) =>
+        LearningLevels.All.FirstOrDefault(level => level.Name == name)?.Rank.ToString() ?? "-";
+
+    private static string CycleNumber(int sequence) => sequence > 0 ? sequence.ToString() : "-";
+
+    private static string DashIfUnset(string value) =>
+        string.IsNullOrWhiteSpace(value) || value == "未設定" ? "-" : value;
+
+    private enum InventorySortColumn
+    {
+        Name,
+        Cycle,
+        Current,
+        Target,
+        Period,
+        Action,
+        Practice,
+        Reflection,
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,49 +608,56 @@
             .Where(action => latestCycleIds.Contains(action.CycleId))
             .ToDictionaryAsync(action => action.CycleId, action => action.Body);
 
+        var practiceByCycle = await db.PracticeRecords
+            .AsNoTracking()
+            .Where(record => latestCycleIds.Contains(record.CycleId))
+            .OrderByDescending(record => record.RecordedAt)
+            .ThenByDescending(record => record.Id)
+            .ToListAsync();
+        var reflectionDoneCycleIds = await db.ReflectionEntries
+            .AsNoTracking()
+            .Where(item => latestCycleIds.Contains(item.CycleId) && item.Body != "")
+            .Select(item => item.CycleId)
+            .ToListAsync();
+
+        var practiceTextByCycle = practiceByCycle
+            .GroupBy(record => record.CycleId)
+            .ToDictionary(
+                group => group.Key,
+                group => string.Join(
+                    Environment.NewLine + Environment.NewLine,
+                    group.Select(record => $"{record.RecordedAt:yyyy-MM-dd HH:mm}{Environment.NewLine}{record.Body}")));
+
         _existingSkills = skills
             .Select(skill => new ExistingSkillItem(
                 skill.Id,
                 skill.Name,
+                skill.Note,
                 skill.CreatedAt,
                 tagsBySkill.GetValueOrDefault(skill.Id, Array.Empty<SkillTagView>()),
                 latestCycleBySkill.TryGetValue(skill.Id, out var cycle)
                     ? cycle.Sequence
                     : 0,
+                cycle?.Id ?? 0,
                 cycle is null ? "未設定" : FormatLevelName(cycle.CurrentLevel),
                 cycle is null ? "未設定" : FormatLevelName(cycle.TargetLevel),
                 cycle is null ? "未設定" : FormatPeriod(cycle),
+                cycle?.StartDate,
+                cycle?.EndDate,
                 cycle is null
                     ? "未設定"
                     : actionByCycle.TryGetValue(cycle.Id, out var actionBody) && !string.IsNullOrWhiteSpace(actionBody)
                         ? actionBody
-                        : "未設定"))
+                        : "未設定",
+                cycle is null
+                    ? "未設定"
+                    : practiceTextByCycle.TryGetValue(cycle.Id, out var practiceText) && !string.IsNullOrWhiteSpace(practiceText)
+                        ? practiceText
+                        : "未設定",
+                cycle is not null && reflectionDoneCycleIds.Contains(cycle.Id)
+                    ? "実施済み"
+                    : "未実施"))
             .ToList();
-    }
-
-    private void AddPendingTag()
-    {
-        _addTagError = null;
-        var name = _addForm.TagName.Trim();
-        if (string.IsNullOrEmpty(name))
-        {
-            _addTagError = "タグ名を入力してください。";
-            return;
-        }
-
-        if (_pendingTagNames.Any(item => string.Equals(item, name, StringComparison.Ordinal)))
-        {
-            _addTagError = "同じタグがすでに含まれています。";
-            return;
-        }
-
-        _pendingTagNames.Add(name);
-        _addForm.TagName = string.Empty;
-    }
-
-    private void RemovePendingTag(string name)
-    {
-        _pendingTagNames.Remove(name);
     }
 
     private async Task AddSkillAsync()
@@ -307,6 +685,7 @@
             var skill = new Skill
             {
                 Name = name,
+                Note = NoteToSave(_addForm.Note),
                 CreatedAt = DateTime.Now,
             };
             db.Skills.Add(skill);
@@ -321,11 +700,8 @@
             db.Cycles.Add(cycle);
             await db.SaveChangesAsync();
 
-            await SkillTagOperations.AddTagsAsync(db, skill.Id, _pendingTagNames);
-
             _addForm.Name = string.Empty;
-            _addForm.TagName = string.Empty;
-            _pendingTagNames.Clear();
+            _addForm.Note = SkillNoteTemplate;
             _suggestedSkillNames.Remove(name);
             if (_suggestedSkillNames.Count > 0)
             {
@@ -370,19 +746,56 @@
     {
         public string Name { get; set; } = string.Empty;
 
-        public string TagName { get; set; } = string.Empty;
+        public string Note { get; set; } = SkillNoteTemplate;
     }
+
+    private static string NoteToSave(string note)
+    {
+        var trimmed = note.Replace("\r\n", "\n").Trim();
+        if (trimmed.Length == 0 || trimmed == SkillNoteTemplate.Replace("\r\n", "\n").Trim())
+        {
+            return string.Empty;
+        }
+
+        return trimmed;
+    }
+
+    private const string SkillNoteTemplate = """
+        ■ スキル詳細、メモ
+
+        ■ 学習の5段階の定義
+        ・0 無意識的無能
+        知らないし、できない
+
+        ・1 意識的無能
+        知っていても、できない
+
+        ・2 意識的有能
+        考えると、できる
+
+        ・3 無意識的有能
+        考えなくても、できる
+
+        ・4 無意識的有能に意識的有能
+        どこからでも、教えられる
+        """;
 
     private sealed record ExistingSkillItem(
         int SkillId,
         string Name,
+        string Note,
         DateTime CreatedAt,
         IReadOnlyList<SkillTagView> Tags,
         int LatestCycleSequence,
+        int LatestCycleId,
         string CurrentLevelText,
         string TargetLevelText,
         string LatestCyclePeriod,
-        string LatestActionText);
+        DateOnly? PeriodStart,
+        DateOnly? PeriodEnd,
+        string LatestActionText,
+        string LatestPracticeText,
+        string LatestReflectionStatus);
 
     private static string FormatLevelName(string? code) =>
         LearningLevels.Find(code)?.Name ?? "未設定";

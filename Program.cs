@@ -142,6 +142,14 @@ using (var scope = app.Services.CreateScope())
     catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
     {
     }
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Skills ADD COLUMN Note TEXT NOT NULL DEFAULT '';");
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+    {
+    }
 }
 
 app.UseExceptionHandler("/Error", createScopeForErrors: true);

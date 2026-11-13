@@ -21,7 +21,7 @@
             @foreach (var level in LearningLevels.All)
             {
                 <li class="guide-level-item">
-                    <span class="level-name">@level.Name</span>
+                    <span class="level-name">@level.Rank @level.Name</span>
                     <span class="level-meaning">@level.Meaning</span>
                 </li>
             }

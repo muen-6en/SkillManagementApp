@@ -1,6 +1,6 @@
 namespace SkillManagementApp.Data;
 
-public sealed record LearningLevelDefinition(string Code, string Name, string Meaning);
+public sealed record LearningLevelDefinition(string Code, string Name, string Meaning, int Rank);
 
 public static class LearningLevels
 {
@@ -12,11 +12,11 @@ public static class LearningLevels
 
     public static IReadOnlyList<LearningLevelDefinition> All { get; } =
     [
-        new(UnconsciousIncompetence, "無意識的無能", "知らないし、できない"),
-        new(ConsciousIncompetence, "意識的無能", "知っていても、できない"),
-        new(ConsciousCompetence, "意識的有能", "考えると、できる"),
-        new(UnconsciousCompetence, "無意識的有能", "考えなくても、できる"),
-        new(UnconsciousCompetenceTeaching, "無意識的有能に意識的有能", "どこからでも、教えられる"),
+        new(UnconsciousIncompetence, "無意識的無能", "知らないし、できない", 0),
+        new(ConsciousIncompetence, "意識的無能", "知っていても、できない", 1),
+        new(ConsciousCompetence, "意識的有能", "考えると、できる", 2),
+        new(UnconsciousCompetence, "無意識的有能", "考えなくても、できる", 3),
+        new(UnconsciousCompetenceTeaching, "無意識的有能に意識的有能", "どこからでも、教えられる", 4),
     ];
 
     public static bool IsValid(string? code) =>

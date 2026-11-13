@@ -26,6 +26,13 @@
     padding: var(--space-m) var(--space-xl);
 }
 
+body:has(.inventory-table) .app-header-inner {
+    box-sizing: border-box;
+    width: calc(100% - 2 * var(--space-m));
+    max-width: 76rem;
+    padding-inline: 0;
+}
+
 .app-header-brand {
     display: inline-flex;
     align-items: center;
@@ -134,6 +141,10 @@
     max-width: 40rem;
     margin: 0 auto;
     padding: var(--space-xl) var(--space-m);
+}
+
+.app-main:has(.inventory-table) {
+    max-width: 76rem;
 }
 
 .app-main > * + * {

@@ -1,6 +1,7 @@
 @inject IDbContextFactory<AppDbContext> DbFactory
 
-<div class="skill-disclosure-actions-wrap">
+<fieldset class="skill-disclosure-actions-wrap">
+    <legend>詳細の編集と確認</legend>
     @if (_deleteError is not null)
     {
         <p class="validation-message" role="alert">@_deleteError</p>
@@ -22,11 +23,15 @@
             <button type="button" class="btn-primary skill-action-edit" @onclick="OpenLearningAsync">
                 編集
             </button>
+            @if (!string.IsNullOrWhiteSpace(PracticeHref))
+            {
+                <a class="btn-primary skill-action-link" href="@PracticeHref">実績登録</a>
+            }
             <button type="button" class="btn-danger skill-action-delete" @onclick="StartDelete">削除</button>
             <a class="btn-secondary skill-action-link skill-action-results" href="@ResultsHref">実績確認</a>
         </div>
     }
-</div>
+</fieldset>
 
 @code {
     [Parameter, EditorRequired]
@@ -37,6 +42,9 @@
 
     [Parameter, EditorRequired]
     public string ResultsHref { get; set; } = string.Empty;
+
+    [Parameter]
+    public string PracticeHref { get; set; } = string.Empty;
 
     [Parameter]
     public EventCallback OnOpenLearning { get; set; }

@@ -13,11 +13,11 @@ else if (_skill is not null)
 {
     <CycleStageNav StageTitle="実績" />
     <h1>実績</h1>
-    @if (_latestCycle is not null)
+    @if (_displayedCycle is not null)
     {
-        <CycleContextSummary Skill="@_skill" Cycle="@_latestCycle" />
+        <CycleContextSummary Skill="@_skill" Cycle="@_displayedCycle" />
     }
-    <p>サイクルごとの現状・目標のレベルと、実践記録の件数を表で見ます。</p>
+    <p>表でサイクルを選び、実践記録の件数を確認します。現在のレベル、目標のレベル、期間、やることは上の設定で確認します。</p>
 
     @if (_rows.Count == 0)
     {
@@ -30,9 +30,8 @@ else if (_skill is not null)
                 <caption class="visually-hidden">@_skill.Name のサイクル別実績</caption>
                 <thead>
                     <tr>
+                        <th scope="col">選択</th>
                         <th scope="col">サイクルの順</th>
-                        <th scope="col">現状</th>
-                        <th scope="col">目標のレベル</th>
                         <th scope="col">実践記録の件数</th>
                         <th scope="col">操作</th>
                     </tr>
@@ -41,15 +40,15 @@ else if (_skill is not null)
                     @foreach (var row in _rows)
                     {
                         <tr>
+                            <td>
+                                <input type="radio"
+                                       name="results-cycle"
+                                       value="@row.CycleId"
+                                       checked="@(row.CycleId == _selectedCycleId)"
+                                       @onchange="() => _selectedCycleId = row.CycleId"
+                                       aria-label="@($"{row.Sequence} のサイクルを選択")" />
+                            </td>
                             <th scope="row">@row.Sequence</th>
-                            <td>
-                                <ResultsLevelCell LevelName="@row.CurrentLevelName"
-                                                  LevelMeaning="@row.CurrentLevelMeaning" />
-                            </td>
-                            <td>
-                                <ResultsLevelCell LevelName="@row.TargetLevelName"
-                                                  LevelMeaning="@row.TargetLevelMeaning" />
-                            </td>
                             <td>@row.RecordCount</td>
                             <td>
                                 <CycleDeleteTableAction SkillId="@SkillId"
@@ -62,6 +61,21 @@ else if (_skill is not null)
                 </tbody>
             </table>
         </div>
+        <div class="form-actions">
+            <button type="button"
+                    class="btn-primary"
+                    @onclick="ShowSelectedCycleAsync"
+                    disabled="@(_selectedCycleId == 0)">
+                選択したサイクルの状態を表示
+            </button>
+            @if (_selectedCycleId != 0)
+            {
+                <a class="btn-primary cycle-next-button"
+                   href="@CycleRoutes.Diff(SkillId, _selectedCycleId)">
+                    差分を見る
+                </a>
+            }
+        </div>
     }
 }
 
@@ -70,16 +84,18 @@ else if (_skill is not null)
     public int SkillId { get; set; }
 
     private Skill? _skill;
-    private Cycle? _latestCycle;
+    private Cycle? _displayedCycle;
     private IReadOnlyList<SkillResultRow> _rows = Array.Empty<SkillResultRow>();
     private bool _invalid;
+    private int _selectedCycleId;
 
     protected override async Task OnParametersSetAsync()
     {
         _invalid = false;
         _skill = null;
-        _latestCycle = null;
+        _displayedCycle = null;
         _rows = Array.Empty<SkillResultRow>();
+        _selectedCycleId = 0;
 
         await using var db = await DbFactory.CreateDbContextAsync();
         var skill = await db.Skills.AsNoTracking().FirstOrDefaultAsync(item => item.Id == SkillId);
@@ -90,18 +106,48 @@ else if (_skill is not null)
         }
 
         _skill = skill;
-        _latestCycle = await db.Cycles
+        var latestCycle = await db.Cycles
             .AsNoTracking()
             .Where(item => item.SkillId == SkillId)
             .OrderByDescending(item => item.Sequence)
             .ThenByDescending(item => item.Id)
             .FirstOrDefaultAsync();
         _rows = await SkillResultsLoader.LoadAsync(db, SkillId);
+        _selectedCycleId = latestCycle?.Id ?? 0;
+        _displayedCycle = latestCycle;
     }
 
     private async Task ReloadRowsAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         _rows = await SkillResultsLoader.LoadAsync(db, SkillId);
+        var selectedCycle = await db.Cycles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == _selectedCycleId && item.SkillId == SkillId);
+        if (selectedCycle is null)
+        {
+            selectedCycle = await db.Cycles
+                .AsNoTracking()
+                .Where(item => item.SkillId == SkillId)
+                .OrderByDescending(item => item.Sequence)
+                .ThenByDescending(item => item.Id)
+                .FirstOrDefaultAsync();
+            _selectedCycleId = selectedCycle?.Id ?? 0;
+        }
+
+        _displayedCycle = selectedCycle;
+    }
+
+    private async Task ShowSelectedCycleAsync()
+    {
+        if (_selectedCycleId == 0)
+        {
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _displayedCycle = await db.Cycles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == _selectedCycleId && item.SkillId == SkillId);
     }
 }

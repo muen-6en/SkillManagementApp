@@ -18,7 +18,41 @@ else if (_skill is not null && _cycle is not null)
     <h1>ふりかえり</h1>
     <CycleDiffButton DiffHref="@CycleRoutes.Diff(SkillId, CycleId)" />
     <CycleContextSummary Skill="@_skill" Cycle="@_cycle" />
-    <p>サイクル @_cycle.Sequence の振り返りを残し、次のサイクルへ進めます。</p>
+    <p>このサイクルで予定したことと、実際にやったことを確認してから、メモを残します。</p>
+
+    <section class="panel" aria-labelledby="reflection-plan-heading">
+        <h2 id="reflection-plan-heading">やること</h2>
+        @if (string.IsNullOrWhiteSpace(_actionBody))
+        {
+            <p class="status status-info" role="status">やることは未設定です。</p>
+        }
+        else
+        {
+            <p class="record-body">@_actionBody</p>
+        }
+    </section>
+
+    <section class="panel" aria-labelledby="reflection-done-heading">
+        <h2 id="reflection-done-heading">やったこと</h2>
+        @if (_records.Count == 0)
+        {
+            <p class="status status-info" role="status">実践記録はまだありません。</p>
+        }
+        else
+        {
+            <ul class="record-list">
+                @foreach (var record in _records)
+                {
+                    <li>
+                        <time datetime="@record.RecordedAt.ToString("yyyy-MM-ddTHH:mm:ss")">
+                            @record.RecordedAt.ToString("yyyy-MM-dd HH:mm")
+                        </time>
+                        <p class="record-body">@record.Body</p>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
 
     @if (_nextCycleId is int nextCycleId)
     {
@@ -29,26 +63,20 @@ else if (_skill is not null && _cycle is not null)
                 新しいサイクルの現状へ進む
             </a>
         </p>
-        <p>
-            <a class="btn-back cycle-next-button"
-               href="@CycleRoutes.Target(SkillId, CycleId)">
-                このサイクルの目標のレベルへ戻る
-            </a>
-        </p>
     }
 
     @if (_isReflectionSaved)
     {
-        <p class="status status-success" role="status">ふりかえりは保存済みです。</p>
+        <p class="status status-success" role="status">サイクルのメモは保存済みです。</p>
     }
     else
     {
-        <p class="status status-info" role="status">ふりかえりはまだ保存されていません。</p>
+        <p class="status status-info" role="status">サイクルのメモはまだ保存されていません。</p>
     }
 
     <EditForm Model="_form" FormName="saveReflection" OnSubmit="SaveAsync">
         <div class="form-field">
-            <label for="reflection-body">ふりかえり</label>
+            <label for="reflection-body">サイクルのメモ</label>
             <InputTextArea id="reflection-body"
                            class="form-control form-control-multiline"
                            @bind-Value="_form.Body"
@@ -70,13 +98,17 @@ else if (_skill is not null && _cycle is not null)
         {
             <p id="reflection-save-status" class="status status-success" role="status">@_saveStatus</p>
         }
-        @if (_nextCycleId is null)
-        {
-            <div class="form-actions cycle-form-submit">
-                <button type="submit" class="btn-save">ふりかえりを保存</button>
-                <button type="button" class="btn-secondary" @onclick="CreateNextCycleAsync">次のサイクルを作る</button>
-            </div>
-        }
+        <div class="form-actions cycle-form-submit">
+            <a class="btn-back cycle-next-button"
+               href="@CycleRoutes.Practice(SkillId, CycleId)">
+                実践記録に戻る
+            </a>
+            @if (_nextCycleId is null)
+            {
+                <button type="submit" class="btn-save">メモを保存</button>
+                <button type="button" class="btn-primary" @onclick="CreateNextCycleAsync">次のサイクルを作る</button>
+            }
+        </div>
     </EditForm>
 }
 
@@ -89,6 +121,8 @@ else if (_skill is not null && _cycle is not null)
 
     private Skill? _skill;
     private Cycle? _cycle;
+    private string? _actionBody;
+    private IReadOnlyList<PracticeRecord> _records = Array.Empty<PracticeRecord>();
     private int? _nextCycleId;
     private bool _invalid;
     private bool _isReflectionSaved;
@@ -102,6 +136,8 @@ else if (_skill is not null && _cycle is not null)
         _invalid = false;
         _skill = null;
         _cycle = null;
+        _actionBody = null;
+        _records = Array.Empty<PracticeRecord>();
         _nextCycleId = null;
         _bodyError = null;
         _saveError = null;
@@ -116,6 +152,17 @@ else if (_skill is not null && _cycle is not null)
         }
 
         (_skill, _cycle) = context.Value;
+
+        var action = await db.CycleActions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.CycleId == CycleId);
+        _actionBody = action?.Body;
+        _records = await db.PracticeRecords
+            .AsNoTracking()
+            .Where(record => record.CycleId == CycleId)
+            .OrderByDescending(record => record.RecordedAt)
+            .ThenByDescending(record => record.Id)
+            .ToListAsync();
 
         var reflection = await db.ReflectionEntries
             .AsNoTracking()
@@ -140,7 +187,7 @@ else if (_skill is not null && _cycle is not null)
         var body = _form.Body.Trim();
         if (string.IsNullOrEmpty(body))
         {
-            _bodyError = "ふりかえりを入力してください。";
+            _bodyError = "サイクルのメモを入力してください。";
             return;
         }
 
@@ -163,7 +210,7 @@ else if (_skill is not null && _cycle is not null)
 
             await db.SaveChangesAsync();
             _isReflectionSaved = true;
-            _saveStatus = "ふりかえりを保存しました。";
+            _saveStatus = "サイクルのメモを保存しました。";
         }
         catch (Exception)
         {
@@ -185,7 +232,7 @@ else if (_skill is not null && _cycle is not null)
         var body = _form.Body.Trim();
         if (string.IsNullOrEmpty(body))
         {
-            _bodyError = "ふりかえりを入力してから、次のサイクルを作ってください。";
+            _bodyError = "サイクルのメモを入力してから、次のサイクルを作ってください。";
             return;
         }
 

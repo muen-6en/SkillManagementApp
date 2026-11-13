@@ -39,6 +39,14 @@ public static class DeletionOperations
             .ToListAsync(cancellationToken);
         db.SkillInventoryEntries.RemoveRange(inventoryEntries);
 
+        var children = await db.Skills
+            .Where(item => item.ParentSkillId == skillId)
+            .ToListAsync(cancellationToken);
+        foreach (var child in children)
+        {
+            child.ParentSkillId = null;
+        }
+
         db.Skills.Remove(skill);
         await db.SaveChangesAsync(cancellationToken);
         return true;

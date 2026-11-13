@@ -1,0 +1,45 @@
+<button type="button"
+        class="@($"skill-tree-item{(_selected ? " is-selected" : "")}")"
+        aria-pressed="@_selected"
+        @onclick="() => OnSelect.InvokeAsync(Skill.Id)">
+    @if (!Skill.ShowInInventory)
+    {
+        <text>【分類】@Skill.Name</text>
+    }
+    else
+    {
+        @Skill.Name
+    }
+</button>
+@if (Children.Any())
+{
+    <ul class="skill-tree">
+        @foreach (var child in Children)
+        {
+            <li>
+                <SkillTreeNode Skill="child" Nodes="Nodes" SelectedSkillId="SelectedSkillId" OnSelect="OnSelect" />
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public SkillTreeItem Skill { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Dictionary<int, SkillTreeItem> Nodes { get; set; } = new();
+
+    [Parameter]
+    public int? SelectedSkillId { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnSelect { get; set; }
+
+    private bool _selected => SelectedSkillId == Skill.Id;
+
+    private IEnumerable<SkillTreeItem> Children =>
+        Nodes.Values
+            .Where(item => item.ParentSkillId == Skill.Id)
+            .OrderBy(item => item.Name, StringComparer.Ordinal);
+}

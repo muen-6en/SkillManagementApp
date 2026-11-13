@@ -41,6 +41,11 @@ public sealed class AppDbContext : DbContext
                 .IsRequired();
 
             entity.HasIndex(skill => skill.CreatedAt);
+
+            entity.HasOne<Skill>()
+                .WithMany()
+                .HasForeignKey(skill => skill.ParentSkillId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Cycle>(entity =>

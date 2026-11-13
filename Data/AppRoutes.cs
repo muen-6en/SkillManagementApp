@@ -12,6 +12,9 @@ public static class AppRoutes
     /// <summary>スキル棚卸</summary>
     public const string Inventory = "/skills";
 
+    /// <summary>スキル整理</summary>
+    public const string Organize = "/skills/organize";
+
     /// <summary>スキル選定アシスタント</summary>
     public const string SkillSuggestion = "/skills/suggest";
 

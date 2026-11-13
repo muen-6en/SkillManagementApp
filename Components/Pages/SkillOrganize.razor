@@ -1,0 +1,886 @@
+@page "/skills/organize"
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IJSRuntime Js
+@using System.Text.Json
+
+<PageTitle>@AppRoutes.PageTitle("スキル整理")</PageTitle>
+
+<h1>スキル整理</h1>
+<div class="organize-mode" role="group" aria-label="整理の機能">
+    <button type="button" class="@ModeClass("tree")" aria-pressed="@(_mode == "tree")" @onclick='() => SetModeAsync("tree")'>ツリー</button>
+    <button type="button" class="@ModeClass("radar")" aria-pressed="@(_mode == "radar")" @onclick='() => SetModeAsync("radar")'>レーダーチャート</button>
+    <button type="button" class="@ModeClass("growth")" aria-pressed="@(_mode == "growth")" @onclick='() => SetModeAsync("growth")'>成長グラフ</button>
+    <button type="button" class="btn-secondary" @onclick="ClearViewAsync">選択をクリア</button>
+</div>
+<p class="field-help">選択した機能、レーダー、成長グラフの内容は、このブラウザを閉じると消えます。</p>
+
+@if (_mode == "tree")
+{
+<p>ツリーで対象のスキルを選び、「親の設定」で親のスキル、または分類を保存してください。新しい分類が必要なときは、「整理用スキルを追加」から登録してください。</p>
+
+<section class="panel" aria-labelledby="organize-add-heading">
+    <h2 id="organize-add-heading">整理用スキルを追加</h2>
+    <div class="form-field">
+        <label for="organize-group-name">名前</label>
+        <input id="organize-group-name" class="form-control" maxlength="200" @bind="_groupName" @bind:event="oninput" />
+    </div>
+    @if (_groupError is not null)
+    {
+        <p class="validation-message" role="alert">@_groupError</p>
+    }
+    @if (_groupStatus is not null)
+    {
+        <p class="status status-success" role="status">@_groupStatus</p>
+    }
+    <button type="button" class="btn-save" @onclick="AddGroupAsync">追加</button>
+</section>
+
+@if (_skills.Count == 0)
+{
+    <p class="status status-info" role="status">スキルはまだありません。</p>
+}
+else
+{
+    <section class="panel" aria-labelledby="organize-tree-heading">
+        <h2 id="organize-tree-heading">ツリー</h2>
+        <ul class="skill-tree">
+            @foreach (var skill in Roots)
+            {
+                <li>
+                    <SkillTreeNode Skill="skill" Nodes="_nodes" SelectedSkillId="_selectedSkillId" OnSelect="SelectSkill" />
+                </li>
+            }
+        </ul>
+    </section>
+
+    @if (SelectedSkill is { } selected)
+    {
+        <section class="panel" aria-labelledby="organize-parent-heading">
+            <h2 id="organize-parent-heading">親の設定</h2>
+            <p>選択中: <strong>@selected.Name</strong></p>
+            <div class="form-field">
+                <label for="organize-parent">親</label>
+                <select id="organize-parent" class="form-control" @bind="_parentDraft">
+                    <option value="">最上位</option>
+                    @foreach (var candidate in ParentCandidates)
+                    {
+                        <option value="@candidate.Id">@(candidate.ShowInInventory ? candidate.Name : $"【分類】{candidate.Name}")</option>
+                    }
+                </select>
+            </div>
+            @if (_saveError is not null)
+            {
+                <p class="validation-message" role="alert">@_saveError</p>
+            }
+            @if (_saveStatus is not null)
+            {
+                <p class="status status-success" role="status">@_saveStatus</p>
+            }
+            <button type="button" class="btn-save" @onclick="SaveParentAsync">保存</button>
+        </section>
+
+        @if (!selected.ShowInInventory)
+        {
+            <section class="panel" aria-labelledby="organize-group-edit-heading">
+                <h2 id="organize-group-edit-heading">整理用スキルの変更</h2>
+                <div class="form-field">
+                    <label for="organize-rename">名前</label>
+                    <input id="organize-rename" class="form-control" maxlength="200" @bind="_renameDraft" @bind:event="oninput" />
+                </div>
+                @if (_renameError is not null)
+                {
+                    <p class="validation-message" role="alert">@_renameError</p>
+                }
+                @if (_renameStatus is not null)
+                {
+                    <p class="status status-success" role="status">@_renameStatus</p>
+                }
+                <button type="button" class="btn-save" @onclick="RenameGroupAsync">名前を保存</button>
+                @if (!_confirmDelete)
+                {
+                    <button type="button" class="btn-danger" @onclick="() => _confirmDelete = true">削除</button>
+                }
+                else
+                {
+                    <p>「@selected.Name」を削除します。配下のスキルは最上位に戻ります。</p>
+                    <button type="button" class="btn-danger" @onclick="DeleteGroupAsync">削除する</button>
+                    <button type="button" class="btn-secondary" @onclick="() => _confirmDelete = false">キャンセル</button>
+                }
+            </section>
+        }
+    }
+}
+}
+else if (_mode == "radar")
+{
+    <section class="panel" aria-labelledby="organize-radar-heading">
+        <h2 id="organize-radar-heading">レーダーチャート</h2>
+        <p>棚卸スキルを軸に選び、スキルごとにサイクルを選ぶと、そのサイクルの現在のレベルを表示します。未選択と未設定は空欄です。</p>
+        @if (!InventorySkills.Any())
+        {
+            <p class="status status-info" role="status">棚卸スキルはまだありません。</p>
+        }
+        else
+        {
+            <fieldset class="level-fieldset">
+                <legend>軸にするスキル</legend>
+                @foreach (var skill in InventorySkills)
+                {
+                    var inputId = $"radar-skill-{skill.Id}";
+                    <div class="level-option">
+                        <input id="@inputId" type="checkbox" checked="@_radarSkillIds.Contains(skill.Id)" @onchange="eventArgs => ToggleRadarSkillAsync(skill.Id, (bool)eventArgs.Value!)" />
+                        <label for="@inputId">@skill.Name</label>
+                        @if (_radarSkillIds.Contains(skill.Id))
+                        {
+                            var cycleId = $"radar-cycle-{skill.Id}";
+                            <div class="form-field radar-skill-cycle">
+                                <label for="@cycleId">サイクル</label>
+                                <select id="@cycleId" class="form-control" value="@SequenceText(skill.Id)" @onchange="eventArgs => SetRadarSequenceAsync(skill.Id, eventArgs.Value?.ToString())">
+                                    <option value="">選んでください</option>
+                                    @foreach (var sequence in SequencesFor(skill.Id))
+                                    {
+                                        <option value="@sequence">@sequence</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                }
+            </fieldset>
+            @if (RadarAxes.Count == 0)
+            {
+                <p class="status status-info" role="status">軸にするスキルを1件以上選んでください。</p>
+            }
+            else
+            {
+                <svg class="skill-radar" viewBox="0 0 800 600" role="img" aria-labelledby="organize-radar-title organize-radar-desc">
+                    <title id="organize-radar-title">選んだサイクルの現在のレベル</title>
+                    <desc id="organize-radar-desc">数値は下の表と同じです。未設定は空欄です。</desc>
+                    @for (var ring = 1; ring <= 4; ring++)
+                    {
+                        <polygon points="@RingPoints(ring / 4d)" class="skill-radar-ring" />
+                    }
+                    @foreach (var axis in RadarGeometry)
+                    {
+                        <line x1="400" y1="300" x2="@axis.EndX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" y2="@axis.EndY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" class="skill-radar-axis" />
+                        @AxisLabel(axis)
+                    }
+                    @if (ValuePoints.Count >= 3 && ValuePoints.Count == RadarGeometry.Count)
+                    {
+                        <polygon points="@string.Join(" ", ValuePoints)" class="skill-radar-value" />
+                    }
+                    else if (ValuePoints.Count >= 2)
+                    {
+                        <polyline points="@string.Join(" ", ValuePoints)" class="skill-radar-value" />
+                    }
+                    @foreach (var axis in RadarGeometry.Where(item => item.HasValue))
+                    {
+                        <circle cx="@axis.ValueX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" cy="@axis.ValueY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" r="5" class="skill-radar-point" />
+                    }
+                </svg>
+                <table class="diff-table">
+                    <caption>選んだサイクルの現在のレベル</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">スキル</th>
+                            <th scope="col">サイクル</th>
+                            <th scope="col">現在のレベル</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var axis in RadarAxes)
+                        {
+                            <tr>
+                                <th scope="row">@axis.Name</th>
+                                <td>@(SequenceText(axis.Id) is { Length: > 0 } sequence ? sequence : "未選択")</td>
+                                <td>@(string.IsNullOrEmpty(LevelText(axis.Id)) ? "未設定" : LevelText(axis.Id))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </section>
+}
+else if (_mode == "growth")
+{
+    <section class="panel" aria-labelledby="organize-growth-heading">
+        <h2 id="organize-growth-heading">成長グラフ</h2>
+        <p>サイクルのある棚卸スキルを1つ選ぶと、全サイクルの現在と目標を折れ線で表示します。未設定の点は空けます。</p>
+        @if (!GrowthSkills.Any())
+        {
+            <p class="status status-info" role="status">サイクルのある棚卸スキルはまだありません。</p>
+        }
+        else
+        {
+            <div class="form-field">
+                <label for="organize-growth-skill">スキル</label>
+                <select id="organize-growth-skill" class="form-control" value="@_growthSkillText" @onchange="eventArgs => SetGrowthSkillAsync(eventArgs.Value?.ToString())">
+                    <option value="">選んでください</option>
+                    @foreach (var skill in GrowthSkills)
+                    {
+                        <option value="@skill.Id">@skill.Name</option>
+                    }
+                </select>
+            </div>
+            @if (GrowthCycles.Count == 0)
+            {
+                <p class="status status-info" role="status">スキルを選んでください。</p>
+            }
+            else
+            {
+                <svg class="skill-growth" viewBox="0 0 800 380" role="img" aria-labelledby="organize-growth-title organize-growth-desc">
+                    <title id="organize-growth-title">サイクルごとの現在と目標</title>
+                    <desc id="organize-growth-desc">数値は下の表と同じです。未設定の点は空いています。</desc>
+                    @foreach (var rank in Enumerable.Range(0, 5))
+                    {
+                        var y = GrowthY(rank)!.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        <line x1="168" x2="760" y1="@y" y2="@y" class="skill-growth-grid" />
+                        @GrowthRankMarkup(rank, y)
+                    }
+                    @foreach (var point in GrowthPoints)
+                    {
+                        <line x1="@point.X.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" x2="@point.X.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" y1="300" y2="308" class="skill-growth-grid" />
+                        @GrowthAxisLabel(point)
+                    }
+                    @foreach (var segment in GrowthSegments(point => point.CurrentY))
+                    {
+                        <polyline points="@segment" class="skill-growth-current" />
+                    }
+                    @foreach (var segment in GrowthSegments(point => point.TargetY))
+                    {
+                        <polyline points="@segment" class="skill-growth-target" />
+                    }
+                    @foreach (var point in GrowthPoints.Where(point => point.CurrentY is not null))
+                    {
+                        <circle cx="@point.X.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" cy="@point.CurrentY!.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" r="4" class="skill-growth-current-point" />
+                    }
+                    @foreach (var point in GrowthPoints.Where(point => point.TargetY is not null))
+                    {
+                        <circle cx="@point.X.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" cy="@point.TargetY!.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" r="4" class="skill-growth-target-point" />
+                    }
+                </svg>
+                <ul class="skill-growth-legend">
+                    <li><span class="skill-growth-swatch skill-growth-current-point"></span>現在のレベル</li>
+                    <li><span class="skill-growth-swatch skill-growth-target-point"></span>目標のレベル</li>
+                </ul>
+                <table class="diff-table">
+                    <caption>サイクルごとの現在と目標</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">サイクル</th>
+                            <th scope="col">期間</th>
+                            <th scope="col">現在</th>
+                            <th scope="col">目標</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cycle in GrowthCycles)
+                        {
+                            <tr>
+                                <th scope="row">@cycle.Sequence</th>
+                                <td>@GrowthPeriod(cycle)</td>
+                                <td>@GrowthLevelText(cycle.CurrentLevel)</td>
+                                <td>@GrowthLevelText(cycle.TargetLevel)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<SkillTreeItem> _skills = Array.Empty<SkillTreeItem>();
+    private Dictionary<int, SkillTreeItem> _nodes = new();
+    private int? _selectedSkillId;
+    private string _parentDraft = string.Empty;
+    private string _groupName = string.Empty;
+    private string _renameDraft = string.Empty;
+    private string? _saveError;
+    private string? _saveStatus;
+    private string? _groupError;
+    private string? _groupStatus;
+    private string? _renameError;
+    private string? _renameStatus;
+    private bool _confirmDelete;
+    private string? _mode;
+    private readonly HashSet<int> _radarSkillIds = [];
+    private readonly Dictionary<int, string> _radarSequences = [];
+    private string _growthSkillText = string.Empty;
+    private bool _viewReady;
+    private List<RadarCycleLevel> _cycleLevels = [];
+
+    private IEnumerable<SkillTreeItem> InventorySkills =>
+        _skills.Where(skill => skill.ShowInInventory).OrderBy(skill => skill.Name, StringComparer.Ordinal);
+
+    private IEnumerable<SkillTreeItem> GrowthSkills =>
+        InventorySkills.Where(skill => _cycleLevels.Any(level => level.SkillId == skill.Id));
+
+    private IReadOnlyList<RadarCycleLevel> GrowthCycles =>
+        int.TryParse(_growthSkillText, out var skillId)
+            ? _cycleLevels.Where(level => level.SkillId == skillId).OrderBy(level => level.Sequence).ToList()
+            : [];
+
+    private IReadOnlyList<GrowthPoint> GrowthPoints
+    {
+        get
+        {
+            var cycles = GrowthCycles;
+            var count = cycles.Count;
+            var result = new List<GrowthPoint>(count);
+            for (var index = 0; index < count; index++)
+            {
+                var x = count == 1 ? 464 : 168 + index * (592d / (count - 1));
+                var cycle = cycles[index];
+                result.Add(new GrowthPoint(
+                    x,
+                    GrowthY(RankOf(cycle.CurrentLevel)),
+                    GrowthY(RankOf(cycle.TargetLevel)),
+                    cycle.Sequence,
+                    GrowthPeriod(cycle)));
+            }
+
+            return result;
+        }
+    }
+    private IReadOnlyList<SkillTreeItem> RadarAxes =>
+        InventorySkills.Where(skill => _radarSkillIds.Contains(skill.Id)).ToList();
+
+    private IEnumerable<int> SequencesFor(int skillId) =>
+        _cycleLevels.Where(level => level.SkillId == skillId).Select(level => level.Sequence).Distinct().OrderBy(sequence => sequence);
+
+    private string SequenceText(int skillId) =>
+        _radarSequences.TryGetValue(skillId, out var sequence) ? sequence : string.Empty;
+
+    private IReadOnlyList<RadarAxis> RadarGeometry
+    {
+        get
+        {
+            var axes = RadarAxes;
+            var count = axes.Count;
+            var result = new List<RadarAxis>(count);
+            for (var index = 0; index < count; index++)
+            {
+                var angle = -Math.PI / 2 + index * 2 * Math.PI / count;
+                var rank = RankFor(axes[index].Id);
+                var scale = rank is int value ? value / 4d : 0;
+                var sequence = SequenceText(axes[index].Id);
+                result.Add(new RadarAxis(
+                    axes[index].Name,
+                    string.IsNullOrEmpty(sequence) ? string.Empty : $"サイクル({sequence})",
+                    400 + Math.Cos(angle) * 155,
+                    300 + Math.Sin(angle) * 155,
+                    400 + Math.Cos(angle) * 198,
+                    300 + Math.Sin(angle) * 198,
+                    400 + Math.Cos(angle) * 155 * scale,
+                    300 + Math.Sin(angle) * 155 * scale,
+                    rank is not null));
+            }
+
+            return result;
+        }
+    }
+
+    private IReadOnlyList<string> ValuePoints =>
+        RadarGeometry
+            .Where(axis => axis.HasValue)
+            .Select(axis => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{axis.ValueX:0.##},{axis.ValueY:0.##}"))
+            .ToList();
+
+    private IEnumerable<SkillTreeItem> Roots =>
+        _skills.Where(skill => skill.ParentSkillId is null).OrderBy(skill => skill.Name, StringComparer.Ordinal);
+
+    private SkillTreeItem? SelectedSkill =>
+        _selectedSkillId is int id && _nodes.TryGetValue(id, out var skill) ? skill : null;
+
+    private IEnumerable<SkillTreeItem> ParentCandidates =>
+        _skills
+            .Where(skill => SelectedSkill is not null && skill.Id != SelectedSkill.Id && !IsDescendant(SelectedSkill.Id, skill.Id))
+            .OrderBy(skill => skill.ShowInInventory)
+            .ThenBy(skill => skill.Name, StringComparer.Ordinal);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _viewReady)
+        {
+            return;
+        }
+
+        _viewReady = true;
+        try
+        {
+            var json = await Js.InvokeAsync<string?>("organizeView.load");
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                var state = JsonSerializer.Deserialize<OrganizeViewState>(json);
+                if (state?.Mode is "tree" or "radar" or "growth")
+                {
+                    _mode = state.Mode;
+                }
+
+                _radarSkillIds.Clear();
+                foreach (var skillId in state?.SkillIds ?? [])
+                {
+                    _radarSkillIds.Add(skillId);
+                }
+
+                _growthSkillText = state?.GrowthSkillId?.ToString() ?? string.Empty;
+                if (!GrowthSkills.Any(skill => skill.Id.ToString() == _growthSkillText))
+                {
+                    _growthSkillText = string.Empty;
+                }
+
+                _radarSequences.Clear();
+                foreach (var item in state?.SkillSequences ?? [])
+                {
+                    _radarSequences[item.SkillId] = item.Sequence.ToString();
+                }
+            }
+        }
+        catch (Exception)
+        {
+            _mode = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private string ModeClass(string mode) =>
+        _mode == mode ? "btn-secondary is-selected" : "btn-secondary";
+
+    private async Task SetModeAsync(string mode)
+    {
+        _mode = mode;
+        await SaveViewAsync();
+    }
+
+    private async Task ClearViewAsync()
+    {
+        _mode = null;
+        _radarSkillIds.Clear();
+        _radarSequences.Clear();
+        _growthSkillText = string.Empty;
+        if (_viewReady)
+        {
+            await Js.InvokeVoidAsync("organizeView.clear");
+        }
+    }
+
+    private async Task ToggleRadarSkillAsync(int skillId, bool selected)
+    {
+        if (selected)
+        {
+            _radarSkillIds.Add(skillId);
+        }
+        else
+        {
+            _radarSkillIds.Remove(skillId);
+            _radarSequences.Remove(skillId);
+        }
+
+        await SaveViewAsync();
+    }
+
+    private async Task SetRadarSequenceAsync(int skillId, string? sequence)
+    {
+        if (string.IsNullOrEmpty(sequence))
+        {
+            _radarSequences.Remove(skillId);
+        }
+        else
+        {
+            _radarSequences[skillId] = sequence;
+        }
+
+        await SaveViewAsync();
+    }
+
+    private async Task SaveViewAsync()
+    {
+        if (!_viewReady || _mode is null)
+        {
+            return;
+        }
+
+        var state = new OrganizeViewState
+        {
+            Mode = _mode,
+            SkillIds = _radarSkillIds.ToList(),
+            SkillSequences = _radarSequences
+                .Where(item => int.TryParse(item.Value, out _))
+                .Select(item => new RadarSkillSequence(item.Key, int.Parse(item.Value)))
+                .ToList(),
+            GrowthSkillId = int.TryParse(_growthSkillText, out var growthSkillId) ? growthSkillId : null,
+        };
+        await Js.InvokeVoidAsync("organizeView.save", JsonSerializer.Serialize(state));
+    }
+
+    private double? GrowthY(int? rank) =>
+        rank is int value ? 300 - value / 4d * 272 : null;
+
+    private static int? RankOf(string? level) =>
+        LearningLevels.Find(level)?.Rank;
+
+    private MarkupString GrowthRankMarkup(int rank, string y)
+    {
+        var markup = $"<text x=\"160\" y=\"{y}\" class=\"skill-growth-label skill-growth-y\">{System.Net.WebUtility.HtmlEncode(GrowthRankLabel(rank))}</text>";
+        return new MarkupString(markup);
+    }
+
+    private static string GrowthRankLabel(int rank)
+    {
+        var level = LearningLevels.All.First(item => item.Rank == rank);
+        return $"{level.Rank} {level.Name}";
+    }
+
+    private static string GrowthPeriod(RadarCycleLevel cycle)
+    {
+        if (cycle.StartDate is null && cycle.EndDate is null)
+        {
+            return "未設定";
+        }
+
+        return $"{cycle.StartDate:yyyy/MM/dd}–{cycle.EndDate:yyyy/MM/dd}";
+    }
+
+    private static string GrowthLevelText(string? level)
+    {
+        var found = LearningLevels.Find(level);
+        return found is null ? "未設定" : $"{found.Rank} {found.Name}";
+    }
+
+    private IEnumerable<string> GrowthSegments(Func<GrowthPoint, double?> coordinate)
+    {
+        var current = new List<string>();
+        foreach (var point in GrowthPoints)
+        {
+            var y = coordinate(point);
+            if (y is null)
+            {
+                if (current.Count >= 2)
+                {
+                    yield return string.Join(" ", current);
+                }
+
+                current.Clear();
+                continue;
+            }
+
+            current.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{point.X:0.##},{y.Value:0.##}"));
+        }
+
+        if (current.Count >= 2)
+        {
+            yield return string.Join(" ", current);
+        }
+    }
+
+    private async Task SetGrowthSkillAsync(string? skillId)
+    {
+        _growthSkillText = skillId ?? string.Empty;
+        await SaveViewAsync();
+    }
+
+    private MarkupString GrowthAxisLabel(GrowthPoint point)
+    {
+        var period = System.Net.WebUtility.HtmlEncode(point.Period);
+        var markup = string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"<text x=\"{point.X:0.##}\" y=\"328\" class=\"skill-growth-label\"><tspan x=\"{point.X:0.##}\">{point.Sequence}</tspan><tspan x=\"{point.X:0.##}\" dy=\"1.3em\">{period}</tspan></text>");
+        return new MarkupString(markup);
+    }
+
+    private int? RankFor(int skillId)
+    {
+        if (!int.TryParse(SequenceText(skillId), out var sequence))
+        {
+            return null;
+        }
+
+        var level = _cycleLevels.FirstOrDefault(item => item.SkillId == skillId && item.Sequence == sequence);
+        return level is null ? null : LearningLevels.Find(level.CurrentLevel)?.Rank;
+    }
+
+    private string LevelText(int skillId)
+    {
+        var rank = RankFor(skillId);
+        var level = LearningLevels.All.FirstOrDefault(item => item.Rank == rank);
+        return level is null ? string.Empty : $"{level.Rank} {level.Name}";
+    }
+
+    private MarkupString AxisLabel(RadarAxis axis)
+    {
+        var name = System.Net.WebUtility.HtmlEncode(string.IsNullOrEmpty(axis.CycleLabel) ? axis.Name : $"{axis.Name}:");
+        var cycle = string.IsNullOrEmpty(axis.CycleLabel)
+            ? string.Empty
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"<tspan x=\"{axis.LabelX:0.##}\" dy=\"1.25em\">{System.Net.WebUtility.HtmlEncode(axis.CycleLabel)}</tspan>");
+        var markup = string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"<text x=\"{axis.LabelX:0.##}\" y=\"{axis.LabelY:0.##}\" class=\"skill-radar-label\">{name}{cycle}</text>");
+        return new MarkupString(markup);
+    }
+
+    private string RingPoints(double scale)
+    {
+        var count = RadarGeometry.Count;
+        if (count < 3)
+        {
+            return string.Empty;
+        }
+
+        var points = new List<string>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var angle = -Math.PI / 2 + index * 2 * Math.PI / count;
+            points.Add(string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"{400 + Math.Cos(angle) * 155 * scale:0.##},{300 + Math.Sin(angle) * 155 * scale:0.##}"));
+        }
+
+        return string.Join(" ", points);
+    }
+
+    private void SelectSkill(int skillId)
+    {
+        _selectedSkillId = skillId;
+        _saveError = null;
+        _saveStatus = null;
+        _renameError = null;
+        _renameStatus = null;
+        _confirmDelete = false;
+        _parentDraft = SelectedSkill?.ParentSkillId?.ToString() ?? string.Empty;
+        _renameDraft = SelectedSkill?.Name ?? string.Empty;
+    }
+
+    private bool IsDescendant(int ancestorId, int skillId)
+    {
+        var current = _nodes.GetValueOrDefault(skillId);
+        var guard = 0;
+        while (current?.ParentSkillId is int parentId && guard < _skills.Count)
+        {
+            if (parentId == ancestorId)
+            {
+                return true;
+            }
+
+            current = _nodes.GetValueOrDefault(parentId);
+            guard++;
+        }
+
+        return false;
+    }
+
+    private bool NameTaken(string name, int? exceptId) =>
+        _skills.Any(skill => skill.Id != exceptId && string.Equals(skill.Name, name, StringComparison.Ordinal));
+
+    private async Task AddGroupAsync()
+    {
+        _groupError = null;
+        _groupStatus = null;
+        var name = _groupName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _groupError = "名前を入力してください。";
+            return;
+        }
+
+        if (NameTaken(name, null))
+        {
+            _groupError = "同じ名前のスキルがすでに登録されています。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Skills.Add(new Skill
+            {
+                Name = name,
+                ShowInInventory = false,
+                CreatedAt = DateTime.Now,
+            });
+            await db.SaveChangesAsync();
+            _groupName = string.Empty;
+            _groupStatus = $"「{name}」を追加しました。";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _groupError = "追加に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private async Task RenameGroupAsync()
+    {
+        _renameError = null;
+        _renameStatus = null;
+        if (SelectedSkill is not { ShowInInventory: false } selected)
+        {
+            return;
+        }
+
+        var name = _renameDraft.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _renameError = "名前を入力してください。";
+            return;
+        }
+
+        if (NameTaken(name, selected.Id))
+        {
+            _renameError = "同じ名前のスキルがすでに登録されています。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skill = await db.Skills.FirstOrDefaultAsync(item => item.Id == selected.Id && !item.ShowInInventory);
+            if (skill is null)
+            {
+                _renameError = "選択した整理用スキルが見つかりません。";
+                await LoadAsync();
+                return;
+            }
+
+            skill.Name = name;
+            await db.SaveChangesAsync();
+            _renameStatus = "名前を保存しました。";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _renameError = "保存に失敗しました。入力内容はそのまま残っています。";
+        }
+    }
+
+    private async Task DeleteGroupAsync()
+    {
+        if (SelectedSkill is not { ShowInInventory: false } selected)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var deleted = await DeletionOperations.TryDeleteSkillAsync(db, selected.Id);
+            if (!deleted)
+            {
+                _renameError = "選択した整理用スキルが見つかりません。";
+            }
+
+            _confirmDelete = false;
+            _selectedSkillId = null;
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _renameError = "削除に失敗しました。";
+        }
+    }
+
+    private async Task SaveParentAsync()
+    {
+        _saveError = null;
+        _saveStatus = null;
+        if (SelectedSkill is not { } selected)
+        {
+            return;
+        }
+
+        int? parentId = int.TryParse(_parentDraft, out var parsed) ? parsed : null;
+        if (parentId == selected.Id || (parentId is int parent && IsDescendant(selected.Id, parent)))
+        {
+            _saveError = "自分自身または配下のスキルは親にできません。";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skill = await db.Skills.FirstOrDefaultAsync(item => item.Id == selected.Id);
+            if (skill is null)
+            {
+                _saveError = "選択したスキルが見つかりません。";
+                await LoadAsync();
+                return;
+            }
+
+            if (parentId is int parentSkillId && !await db.Skills.AnyAsync(item => item.Id == parentSkillId))
+            {
+                _saveError = "選択した親が見つかりません。";
+                await LoadAsync();
+                return;
+            }
+
+            skill.ParentSkillId = parentId;
+            await db.SaveChangesAsync();
+            _saveStatus = "親を保存しました。";
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            _saveError = "保存に失敗しました。選択内容はそのまま残っています。";
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var skills = await db.Skills.AsNoTracking()
+            .OrderBy(skill => skill.Name)
+            .Select(skill => new SkillTreeItem(skill.Id, skill.Name, skill.ParentSkillId, skill.ShowInInventory))
+            .ToListAsync();
+        _skills = skills;
+        _nodes = skills.ToDictionary(skill => skill.Id);
+        _cycleLevels = await db.Cycles.AsNoTracking()
+            .Select(cycle => new RadarCycleLevel(cycle.SkillId, cycle.Sequence, cycle.CurrentLevel, cycle.TargetLevel, cycle.StartDate, cycle.EndDate))
+            .ToListAsync();
+        if (_selectedSkillId is int selectedId && !_nodes.ContainsKey(selectedId))
+        {
+            _selectedSkillId = null;
+            _parentDraft = string.Empty;
+            _renameDraft = string.Empty;
+        }
+        else if (SelectedSkill is not null && _saveError is null && _renameError is null)
+        {
+            _parentDraft = SelectedSkill.ParentSkillId?.ToString() ?? string.Empty;
+            _renameDraft = SelectedSkill.Name;
+        }
+    }
+
+    private sealed class OrganizeViewState
+    {
+        public string? Mode { get; set; }
+
+        public List<int> SkillIds { get; set; } = [];
+
+        public List<RadarSkillSequence> SkillSequences { get; set; } = [];
+
+        public int? GrowthSkillId { get; set; }
+    }
+
+    private sealed record RadarSkillSequence(int SkillId, int Sequence);
+
+    private sealed record RadarCycleLevel(int SkillId, int Sequence, string? CurrentLevel, string? TargetLevel, DateOnly? StartDate, DateOnly? EndDate);
+
+    private sealed record GrowthPoint(double X, double? CurrentY, double? TargetY, int Sequence, string Period);
+
+    private sealed record RadarAxis(
+        string Name,
+        string CycleLabel,
+        double EndX,
+        double EndY,
+        double LabelX,
+        double LabelY,
+        double ValueX,
+        double ValueY,
+        bool HasValue);
+}

@@ -8,5 +8,9 @@ public sealed class Skill
 
     public string Note { get; set; } = string.Empty;
 
+    public int? ParentSkillId { get; set; }
+
+    public bool ShowInInventory { get; set; } = true;
+
     public DateTime CreatedAt { get; set; }
 }

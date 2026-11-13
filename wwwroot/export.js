@@ -9,3 +9,14 @@ window.skillExport = {
         URL.revokeObjectURL(url);
     }
 };
+window.organizeView = {
+    load() {
+        return sessionStorage.getItem("skill-organize-view");
+    },
+    save(value) {
+        sessionStorage.setItem("skill-organize-view", value);
+    },
+    clear() {
+        sessionStorage.removeItem("skill-organize-view");
+    }
+};

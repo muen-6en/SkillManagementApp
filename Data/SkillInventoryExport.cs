@@ -102,7 +102,7 @@ public static class SkillInventoryExport
 
     private static async Task<IReadOnlyList<ExportSkill>> LoadAsync(AppDbContext db)
     {
-        var skills = await db.Skills.AsNoTracking().ToListAsync();
+        var skills = await db.Skills.AsNoTracking().Where(skill => skill.ShowInInventory).ToListAsync();
         var tags = await db.SkillTags.AsNoTracking().OrderBy(tag => tag.Name).ToListAsync();
         var cycles = await db.Cycles.AsNoTracking().OrderBy(cycle => cycle.Sequence).ToListAsync();
         var actions = await db.CycleActions.AsNoTracking().ToListAsync();

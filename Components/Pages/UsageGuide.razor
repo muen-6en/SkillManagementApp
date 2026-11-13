@@ -4,8 +4,9 @@
 
 <h1>使い方</h1>
 <p>
-    このアプリは、1つのスキルについて「いまどこにいるか」「どこへ向かうか」「何をするか」を記録し、
-    サイクルを回しながら学習を進めるための補助ツールです。データはお使いの PC のローカルに保存されます。
+    記録の中心はスキル棚卸です。1つのスキルについて「いまどこにいるか」「どこへ向かうか」「何をするか」を残し、
+    サイクルを回しながら学習を進めます。データはお使いの PC のローカルに保存されます。
+    スキル選定とスキル整理は、棚卸の前後で使う補助です。
 </p>
 
 <section class="panel guide-section" aria-labelledby="guide-inventory-heading">
@@ -14,7 +15,7 @@
         <li>
             <strong>スキルを追加する</strong>
             <p>「新しく追加するスキル」で名前を入力して「スキルに追加」します。タグは、追加したスキルの一覧から付けます。</p>
-            <p>どのスキルを選ぶか迷ったときは、「スキル選定」で仕事の課題から候補を整理して追加できます。</p>
+            <p>どのスキルを登録するか迷ったときは、下の「スキル選定」で仕事の課題から候補を整理できます。</p>
         </li>
         <li>
             <strong>編集でサイクルを開く</strong>
@@ -27,6 +28,21 @@
     </ol>
     <p>
         <a class="btn-primary guide-start-link" href="@AppRoutes.Inventory">スキル棚卸へ</a>
+    </p>
+</section>
+
+<section class="panel guide-section" aria-labelledby="guide-support-heading">
+    <h2 id="guide-support-heading">補助の機能</h2>
+    <p>棚卸で記録するスキルを見つけるとき、または登録したスキルの関係とレベルを見るときに使います。</p>
+    <h3>スキル選定</h3>
+    <p>棚卸対象の期間とタスクから課題を整理し、登録するスキルの候補を作ります。</p>
+    <p>
+        <a class="btn-secondary" href="@AppRoutes.SkillSuggestion">スキル選定へ</a>
+    </p>
+    <h3>スキル整理</h3>
+    <p>登録したスキルの親子をツリーで保存します。分類は棚卸には出ません。レーダーチャートと成長グラフで、選んだスキルのレベルを見ます。</p>
+    <p>
+        <a class="btn-secondary" href="@AppRoutes.Organize">スキル整理へ</a>
     </p>
 </section>
 

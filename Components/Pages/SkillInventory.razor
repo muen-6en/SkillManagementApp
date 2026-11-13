@@ -604,6 +604,7 @@
         await using var db = await DbFactory.CreateDbContextAsync();
         var skills = await db.Skills
             .AsNoTracking()
+            .Where(skill => skill.ShowInInventory)
             .OrderByDescending(skill => skill.CreatedAt)
             .ThenByDescending(skill => skill.Id)
             .ToListAsync();

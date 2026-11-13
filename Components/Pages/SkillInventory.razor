@@ -1,6 +1,7 @@
 @page "/skills"
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 
 <PageTitle>@AppRoutes.PageTitle("スキル棚卸")</PageTitle>
 
@@ -65,6 +66,14 @@
 
 <section class="panel" aria-labelledby="inventory-existing-heading">
     <h2 id="inventory-existing-heading">あなたのスキル</h2>
+    <div class="inventory-export">
+        <button type="button" class="btn-secondary" disabled="@(_existingSkills.Count == 0)" @onclick="ExportMarkdownAsync">Markdownで出力</button>
+        <button type="button" class="btn-secondary" disabled="@(_existingSkills.Count == 0)" @onclick="ExportCsvAsync">CSVで出力</button>
+    </div>
+    @if (_exportError is not null)
+    {
+        <p class="validation-message" role="alert">@_exportError</p>
+    }
     @if (_existingSkills.Count == 0)
     {
         <p>スキルはまだありません。上の欄から名前を入力して追加してください。</p>
@@ -563,6 +572,30 @@
         if (_suggestedSkillNames.Count > 0)
         {
             _addForm.Name = _suggestedSkillNames[0];
+        }
+    }
+
+    private string? _exportError;
+
+    private async Task ExportMarkdownAsync() =>
+        await DownloadAsync("md", "text/markdown;charset=utf-8", SkillInventoryExport.BuildMarkdownAsync);
+
+    private async Task ExportCsvAsync() =>
+        await DownloadAsync("csv", "text/csv;charset=utf-8", SkillInventoryExport.BuildCsvAsync);
+
+    private async Task DownloadAsync(string extension, string mimeType, Func<AppDbContext, Task<string>> build)
+    {
+        _exportError = null;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var content = await build(db);
+            var fileName = $"スキル棚卸_{DateTime.Now:yyyyMMdd}.{extension}";
+            await Js.InvokeVoidAsync("skillExport.download", fileName, content, mimeType);
+        }
+        catch (Exception)
+        {
+            _exportError = "出力に失敗しました。もう一度試してください。";
         }
     }
 

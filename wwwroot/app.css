@@ -642,6 +642,13 @@ a.skill-action-link {
     text-align: center;
 }
 
+.inventory-export {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+    margin: 0 0 var(--space-m);
+}
+
 .inventory-selected[hidden] {
     display: none;
 }

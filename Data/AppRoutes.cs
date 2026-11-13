@@ -18,4 +18,7 @@ public static class AppRoutes
     /// <summary>スキル選定アシスタント</summary>
     public const string SkillSuggestion = "/skills/suggest";
 
+    /// <summary>ヘルプ（OSS情報）</summary>
+    public const string Help = "/help";
+
 }

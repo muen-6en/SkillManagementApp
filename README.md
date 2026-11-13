@@ -22,6 +22,7 @@
 - サイクルごとの差分確認
 - サイクルごとの実績確認
 - 学習の5段階の共通ナビゲーション
+- ヘルプ（利用ライブラリのライセンス）
 
 ## 動作環境
 
@@ -56,6 +57,7 @@ dotnet run --urls http://localhost:5079
 | スキル棚卸 | `/skills` | スキル・タグの登録と管理。Markdown / CSV 出力 |
 | スキル整理 | `/skills/organize` | 親子のツリー、レーダーチャート、成長グラフ |
 | スキル選定 | `/skills/suggest` | 仕事のタスクから身に着けるスキル候補を整理 |
+| ヘルプ | `/help` | 利用している実行環境とライブラリのライセンス |
 | 現状 | `/skills/{skillId}/cycles/{cycleId}/current` | 現在のレベルを登録 |
 | 目標のレベル | `/skills/{skillId}/cycles/{cycleId}/target` | 目標のレベルを登録 |
 | 実践 | `/skills/{skillId}/cycles/{cycleId}/practice` | やることと実践記録を登録 |

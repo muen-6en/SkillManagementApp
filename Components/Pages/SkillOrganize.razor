@@ -561,9 +561,9 @@ else if (_mode == "growth")
             var y = coordinate(point);
             if (y is null)
             {
-                if (current.Count >= 2)
+                foreach (var segment in FlushSegment(current))
                 {
-                    yield return string.Join(" ", current);
+                    yield return segment;
                 }
 
                 current.Clear();
@@ -573,10 +573,31 @@ else if (_mode == "growth")
             current.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{point.X:0.##},{y.Value:0.##}"));
         }
 
+        foreach (var segment in FlushSegment(current))
+        {
+            yield return segment;
+        }
+    }
+
+    private static IEnumerable<string> FlushSegment(List<string> current)
+    {
         if (current.Count >= 2)
         {
             yield return string.Join(" ", current);
+            yield break;
         }
+
+        if (current.Count != 1)
+        {
+            yield break;
+        }
+
+        var parts = current[0].Split(',');
+        var x = double.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+        var y = parts[1];
+        yield return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{x - 16:0.##},{y} {x + 16:0.##},{y}");
     }
 
     private async Task SetGrowthSkillAsync(string? skillId)
